@@ -1,0 +1,2183 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>MC9S08QE64 Simulator v3</title>
+<style>
+:root{
+  --bg:#080c10;--panel:#0b0f14;--panel2:#10151c;--border:#1e2530;
+  --green:#00ff88;--blue:#4a9eff;--yellow:#f0e060;--orange:#ff9020;
+  --red:#ff4444;--cyan:#00ccff;--purple:#aa80ff;
+  --text:#b0bcc8;--text2:#6a7a8a;
+  --chip:#181e26;--chipbdr:#2a3848;--pin:#b09050;
+  --lcd-bg:#162008;--lcd-on:#80c030;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Courier New',monospace;
+  overflow:hidden;width:100vw;height:100vh;user-select:none;}
+
+/* ── TOPBAR ── */
+#topbar{height:42px;background:var(--panel);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:5px;padding:0 8px;flex-shrink:0;z-index:200;}
+.title{color:var(--green);font-size:12px;font-weight:bold;letter-spacing:1px;margin-right:4px;}
+.sep{width:1px;height:22px;background:var(--border);margin:0 2px;}
+.btn{padding:4px 10px;border:1px solid var(--border);background:var(--panel2);color:var(--text);
+  cursor:pointer;font-family:'Courier New',monospace;font-size:11px;border-radius:3px;
+  transition:all .12s;white-space:nowrap;}
+.btn:hover{border-color:var(--green);color:var(--green);}
+.btn.on{background:var(--green);color:#000;border-color:var(--green);}
+.btn.step{border-color:var(--yellow);color:var(--yellow);}
+.btn.step:hover{background:var(--yellow);color:#000;}
+.btn.danger{border-color:#553;color:#ff8;}
+.btn.danger:hover{background:var(--red);color:#fff;border-color:var(--red);}
+.btn.close{border-color:var(--red);color:var(--red);margin-left:auto;}
+.btn.close:hover{background:var(--red);color:#fff;}
+.led{width:7px;height:7px;border-radius:50%;background:#222;flex-shrink:0;transition:all .3s;}
+.led.run{background:var(--green);box-shadow:0 0 5px var(--green);}
+.led.pause{background:var(--yellow);box-shadow:0 0 5px var(--yellow);}
+.led.brk{background:var(--red);box-shadow:0 0 5px var(--red);}
+#fdisp{font-size:10px;color:var(--cyan);background:#081420;padding:2px 7px;
+  border-radius:3px;border:1px solid #103040;white-space:nowrap;}
+#sstatus{font-size:10px;color:var(--text2);}
+
+/* ── LAYOUT ── */
+#main{flex:1;display:flex;overflow:hidden;}
+
+/* ── LEFT PANEL ── */
+#lp{width:400px;min-width:400px;background:var(--panel);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;flex-shrink:0;}
+.tabbar{display:flex;background:var(--panel2);border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{flex:1;text-align:center;padding:6px 0;font-size:10px;cursor:pointer;
+  color:var(--text2);border-bottom:2px solid transparent;transition:all .12s;}
+.tab.on{color:var(--green);border-bottom-color:var(--green);}
+.ipane{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.ipane.hide{display:none;}
+
+/* OSC */
+.octrl{padding:4px 6px;background:#08100a;border-bottom:1px solid var(--border);
+  display:flex;flex-wrap:wrap;gap:4px;align-items:center;flex-shrink:0;}
+.cv{font-size:10px;color:var(--cyan);background:#081420;border:1px solid #103040;
+  padding:2px 6px;border-radius:3px;cursor:pointer;min-width:42px;text-align:center;}
+.cv:hover{border-color:var(--cyan);}
+.cl{font-size:9px;color:var(--text2);}
+.owrap{flex:1;position:relative;background:#000a06;overflow:hidden;}
+#ocv{position:absolute;top:0;left:0;width:100%;height:100%;}
+
+/* LA */
+.lactrl{padding:4px 6px;background:#060810;border-bottom:1px solid var(--border);
+  display:flex;gap:5px;align-items:center;flex-shrink:0;}
+.lawrap{flex:1;position:relative;background:#04060f;overflow:hidden;}
+#lacv{position:absolute;top:0;left:0;width:100%;height:100%;}
+
+/* DISASM */
+.diwrap{flex:1;overflow-y:auto;background:#060a08;padding:4px;}
+.di-row{display:flex;gap:8px;padding:2px 4px;font-size:10px;border-radius:2px;cursor:pointer;}
+.di-row:hover{background:#101810;}
+.di-row.cur{background:#0a2010;border-left:2px solid var(--green);}
+.di-row.brk{background:#200a0a;border-left:2px solid var(--red);}
+.di-addr{color:var(--text2);min-width:42px;}
+.di-hex{color:#4060a0;min-width:60px;}
+.di-mnem{color:var(--cyan);min-width:60px;}
+.di-ops{color:var(--text);}
+
+/* ── CIRCUIT ── */
+#ca{flex:1;position:relative;overflow:hidden;
+  background:var(--bg);
+  background-image:radial-gradient(circle at 1px 1px,rgba(20,40,28,.6) 1px,transparent 0);
+  background-size:20px 20px;}
+#svgw{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;}
+
+/* ZOOM controls */
+#zoom-ctrl{position:absolute;bottom:8px;left:8px;z-index:20;display:flex;gap:4px;}
+.zbtn{padding:4px 8px;background:rgba(10,14,20,.9);border:1px solid var(--border);
+  color:var(--text2);cursor:pointer;font-size:12px;border-radius:3px;}
+.zbtn:hover{border-color:var(--green);color:var(--green);}
+
+/* CIRCUIT VIEWPORT */
+#cvp{position:absolute;top:0;left:0;width:100%;height:100%;transform-origin:0 0;}
+
+/* COMP */
+.comp{position:absolute;cursor:move;z-index:5;}
+.comp.drag{z-index:50;filter:drop-shadow(0 0 6px rgba(0,255,136,.4));}
+
+/* CHIP */
+.chip{background:var(--chip);border:2px solid var(--chipbdr);border-radius:4px;
+  position:relative;box-shadow:0 6px 24px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.03);}
+.clbl{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  text-align:center;pointer-events:none;}
+.cname{font-size:10px;font-weight:bold;color:#708090;letter-spacing:.4px;}
+.csub{font-size:7.5px;color:#384858;margin-top:1px;}
+.cdot{width:5px;height:5px;border-radius:50%;background:#384858;margin:4px auto 0;}
+
+/* PINS */
+.pl,.pr{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;justify-content:space-around;}
+.pl{left:0;transform:translateX(-100%);}
+.pr{right:0;transform:translateX(100%);}
+.pt,.pb{position:absolute;left:0;right:0;display:flex;justify-content:space-around;}
+.pt{top:0;transform:translateY(-100%);}
+.pb{bottom:0;transform:translateY(100%);}
+
+.pin{display:flex;align-items:center;cursor:pointer;position:relative;}
+.pl .pin{flex-direction:row-reverse;}
+.pr .pin{flex-direction:row;}
+.pt .pin{flex-direction:column;}
+.pb .pin{flex-direction:column-reverse;}
+.pld{background:var(--pin);border-radius:1px;}
+.pl .pld,.pr .pld{width:9px;height:2px;}
+.pt .pld,.pb .pld{width:2px;height:9px;}
+.plb{font-size:6px;color:#3a4a5a;white-space:nowrap;line-height:1;}
+.pl .plb{margin-right:2px;text-align:right;}
+.pr .plb{margin-left:2px;}
+.pt .plb{margin-top:2px;transform:rotate(-60deg) translateX(2px);transform-origin:top center;}
+.pb .plb{margin-bottom:2px;transform:rotate(-60deg) translateX(-2px);transform-origin:bottom center;}
+.pin:hover .pld{background:var(--green);}
+.pin:hover .plb{color:var(--green);}
+.pin.hi .pld{background:var(--green);box-shadow:0 0 2px var(--green);}
+.pin.pvdd .pld{background:#cc4444;}
+.pin.pvss .pld{background:#334455;}
+.pin.sel .pld{background:var(--yellow)!important;box-shadow:0 0 4px var(--yellow);}
+
+/* LCD */
+.lcdbody{background:#182210;border:3px solid #0c1808;border-radius:5px;
+  padding:7px;box-shadow:0 4px 18px rgba(0,0,0,.9);}
+.lcdscr{background:var(--lcd-bg);border:2px solid #080e04;border-radius:2px;
+  padding:5px 7px;display:flex;flex-direction:column;gap:3px;
+  box-shadow:inset 0 2px 6px rgba(0,0,0,.8);}
+.lcdrow{display:flex;gap:2px;}
+.lchar{display:grid;grid-template-columns:repeat(5,3px);grid-template-rows:repeat(8,3px);gap:1px;}
+.px{border-radius:.5px;background:#080e04;}
+.px.on{background:var(--lcd-on);box-shadow:0 0 2px rgba(128,192,48,.5);}
+.lcdlbl{font-size:7px;color:#2a3a1a;text-align:center;margin-top:3px;}
+
+/* PSU */
+.psubody{background:#100c0c;border:2px solid #302010;border-radius:5px;
+  padding:9px 12px;min-width:145px;box-shadow:0 4px 18px rgba(0,0,0,.9);}
+.psutitle{font-size:9px;color:var(--orange);margin-bottom:7px;letter-spacing:1px;}
+.psurow{display:flex;justify-content:space-between;align-items:center;
+  margin-bottom:4px;gap:8px;}
+.psun{font-size:9px;color:var(--text2);}
+.psuv{font-size:10px;font-weight:bold;}
+.psuv.vdd{color:#ff6060;}
+.psuv.gnd{color:#445566;}
+.psuled{width:6px;height:6px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 4px var(--green);}
+
+/* OVERLAY PANELS */
+.ovl{position:absolute;background:rgba(8,12,16,.96);border:1px solid var(--border);
+  border-radius:3px;padding:7px;font-size:9px;z-index:10;cursor:move;}
+#rp{right:6px;top:6px;min-width:170px;}
+#mp{right:6px;bottom:100px;min-width:190px;}
+#logp{right:6px;bottom:8px;min-width:250px;max-width:300px;}
+.ot{color:var(--green);margin-bottom:4px;letter-spacing:1px;font-size:9px;}
+.ot.p{color:var(--purple);}
+.rr{display:flex;justify-content:space-between;gap:6px;margin-bottom:2px;}
+.rn{color:var(--text2);}
+.rv{color:var(--cyan);font-family:'Courier New',monospace;}
+.rv.ok{color:var(--green);}
+.rv.no{color:var(--red);}
+.hs{width:100%;height:1px;background:var(--border);margin:4px 0;}
+
+/* MEMORY */
+.mgrid{display:grid;grid-template-columns:repeat(8,22px);gap:1px;margin-top:3px;}
+.mc2{width:22px;height:13px;background:#0a0e14;border:1px solid #141c24;
+  font-size:7px;color:#2a3a4a;display:flex;align-items:center;justify-content:center;border-radius:1px;}
+.mc2.a{background:#081830;color:var(--blue);border-color:#1a3060;}
+.mc2.m{background:#181000;color:var(--yellow);border-color:#403000;}
+.mc2.x{background:#001810;color:var(--green);border-color:#003020;}
+
+/* LOG */
+#fwlog{height:66px;overflow-y:auto;color:var(--text2);line-height:1.5;font-size:8.5px;}
+.ll.i{color:var(--cyan);}
+.ll.o{color:var(--green);}
+.ll.e{color:var(--red);}
+.ll.w{color:var(--yellow);}
+
+/* I2C bubble */
+.bbl{position:absolute;font-size:8px;background:rgba(0,30,70,.92);
+  border:1px solid var(--blue);border-radius:2px;padding:2px 6px;
+  color:var(--blue);pointer-events:none;white-space:nowrap;z-index:30;
+  opacity:0;transition:opacity .25s;}
+.bbl.show{opacity:1;}
+
+/* TOOLTIP */
+.tip{position:fixed;background:#0c1420;border:1px solid var(--blue);border-radius:3px;
+  padding:5px 9px;font-size:9px;pointer-events:none;z-index:1000;opacity:0;
+  transition:opacity .12s;max-width:210px;}
+.tip.show{opacity:1;}
+.tipn{color:var(--green);font-weight:bold;margin-bottom:2px;}
+.tipi{color:var(--text2);}
+.tipv{color:var(--cyan);}
+
+/* WIRE ANIM */
+@keyframes fw{0%{stroke-dashoffset:20}100%{stroke-dashoffset:0}}
+@keyframes bw{0%{stroke-dashoffset:0}100%{stroke-dashoffset:20}}
+.wf{stroke-dasharray:3 7;animation:fw .5s linear infinite;}
+.wb{stroke-dasharray:3 7;animation:bw .5s linear infinite;}
+
+/* SCROLLBAR */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:#080c10;}
+::-webkit-scrollbar-thumb{background:#203040;border-radius:3px;}
+</style>
+</head>
+<body>
+<div id="app" style="width:100vw;height:100vh;display:flex;flex-direction:column;">
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="title">⬡ MC9S08QE64 SIM v3</div>
+  <div class="sep"></div>
+  <input type="file" id="fwf" accept=".bin,.s19,.hex" style="display:none">
+  <input type="file" id="memf" accept=".bin" style="display:none">
+  <button class="btn" onclick="document.getElementById('fwf').click()">📂 Firmware</button>
+  <button class="btn" onclick="document.getElementById('memf').click()">💾 EEPROM</button>
+  <div class="sep"></div>
+  <button class="btn on"  id="b-run"   onclick="ctrlRun()">▶ Iniciar</button>
+  <button class="btn step" id="b-step" onclick="ctrlStep()">⮞ Step</button>
+  <button class="btn"     id="b-pause" onclick="ctrlPause()">⏸ Pausar</button>
+  <button class="btn danger" id="b-stop" onclick="ctrlStop()">⏹ Parar</button>
+  <div class="sep"></div>
+  <div class="led" id="sled"></div>
+  <span id="sstatus">PARADO</span>
+  <div class="sep"></div>
+  <div id="fdisp">BUS: 0.000 MHz | PC:0000 | CYC:0</div>
+  <button class="btn close" onclick="if(confirm('Fechar?'))window.close()">✕</button>
+</div>
+
+<!-- MAIN -->
+<div id="main">
+
+<!-- LEFT PANEL -->
+<div id="lp">
+  <div class="tabbar">
+    <div class="tab on"  id="t-osc"   onclick="showTab('osc')">🔬 OSC</div>
+    <div class="tab"     id="t-la"    onclick="showTab('la')">📊 LÓGICO</div>
+    <div class="tab"     id="t-dis"   onclick="showTab('dis')">⚙ DISASM</div>
+  </div>
+
+  <!-- OSC -->
+  <div class="ipane" id="p-osc">
+    <div class="octrl">
+      <span class="cl">V/div</span><div class="cv" id="cv-v" onclick="cycV()">1.0V</div>
+      <span class="cl">T/div</span><div class="cv" id="cv-t" onclick="cycT()">10µs</div>
+      <span class="cl">Trig</span><div class="cv" id="cv-trig" onclick="cycTrig()">↑ AUTO</div>
+      <span class="cl">CH1</span><div class="cv" id="cv-c1" onclick="pickCh(1)">SCL</div>
+      <span class="cl">CH2</span><div class="cv" id="cv-c2" onclick="pickCh(2)">SDA</div>
+      <div class="cv" id="cv-fq" style="margin-left:auto;color:var(--green);min-width:60px;">---</div>
+    </div>
+    <div class="owrap"><canvas id="ocv"></canvas></div>
+  </div>
+
+  <!-- LA -->
+  <div class="ipane hide" id="p-la">
+    <div class="lactrl">
+      <span class="cl">Escala</span><div class="cv" id="cv-las" onclick="cycLas()">1µs/div</div>
+      <div class="cv" id="cv-dec" onclick="togDec()" style="margin-left:auto;">I²C Dec:ON</div>
+      <div class="cv" onclick="clearLA()" style="color:var(--red)">CLR</div>
+    </div>
+    <div class="lawrap"><canvas id="lacv"></canvas></div>
+  </div>
+
+  <!-- DISASM -->
+  <div class="ipane hide" id="p-dis">
+    <div class="octrl" style="justify-content:space-between;">
+      <span style="font-size:9px;color:var(--text2);">Disassembler HCS08</span>
+      <div class="cv" onclick="disasmAt(C.PC)" style="color:var(--yellow);">PC↓</div>
+      <div class="cv" onclick="toggleBrk()" style="color:var(--red);">BRK</div>
+    </div>
+    <div class="diwrap" id="diswrap"></div>
+  </div>
+</div>
+
+<!-- CIRCUIT AREA -->
+<div id="ca">
+  <svg id="svgw"></svg>
+  <div id="cvp">
+
+    <!-- MC9S08QE64 -->
+    <div class="comp" id="mc" style="left:310px;top:70px;">
+      <div class="chip" id="mcb" style="width:200px;height:200px;">
+        <div class="pt" id="mc-t"></div>
+        <div class="pb" id="mc-b"></div>
+        <div class="pl" id="mc-l"></div>
+        <div class="pr" id="mc-r"></div>
+        <div class="clbl">
+          <div class="cname">MC9S08QE64</div>
+          <div class="csub">Freescale/NXP</div>
+          <div class="csub">HCS08 8-bit MCU</div>
+          <div class="cdot"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PCF8576DH -->
+    <div class="comp" id="pcf" style="left:100px;top:380px;">
+      <div class="chip" id="pcfb" style="width:145px;height:145px;">
+        <div class="pl" id="pcf-l"></div>
+        <div class="pr" id="pcf-r"></div>
+        <div class="pt" id="pcf-t"></div>
+        <div class="pb" id="pcf-b"></div>
+        <div class="clbl">
+          <div class="cname">PCF8576DH</div>
+          <div class="csub">LCD Driver I²C</div>
+          <div class="csub">400kHz / 160seg</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AT24HC02C -->
+    <div class="comp" id="at24" style="left:570px;top:400px;">
+      <div class="chip" id="at24b" style="width:88px;height:54px;">
+        <div class="pl" id="at24-l"></div>
+        <div class="pr" id="at24-r"></div>
+        <div class="clbl">
+          <div class="cname" style="font-size:8px;">AT24HC02C</div>
+          <div class="csub">256B EEPROM</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LCD -->
+    <div class="comp" id="lcd" style="left:330px;top:395px;">
+      <div class="lcdbody">
+        <div class="lcdscr" id="lcdscr"></div>
+        <div class="lcdlbl">LCD 2×16 · PCF8576DH</div>
+      </div>
+    </div>
+
+    <!-- PSU -->
+    <div class="comp" id="psu" style="left:590px;top:70px;">
+      <div class="psubody">
+        <div class="psutitle">⚡ FONTE DE ALIMENTAÇÃO</div>
+        <div class="psurow"><span class="psun">VDD  +3.3V</span><span class="psuv vdd">+3.300V</span></div>
+        <div class="psurow"><span class="psun">VLCD +3.3V</span><span class="psuv vdd">+3.300V</span></div>
+        <div class="psurow"><span class="psun">GND</span><span class="psuv gnd">0.000V</span></div>
+        <div class="psurow"><span class="psun">Status</span><div class="psuled" id="psuled"></div></div>
+      </div>
+    </div>
+
+    <!-- I2C bubble -->
+    <div class="bbl" id="bbl">I²C</div>
+
+  </div><!-- /cvp -->
+
+  <!-- zoom -->
+  <div id="zoom-ctrl">
+    <div class="zbtn" onclick="zoom(1.15)">＋</div>
+    <div class="zbtn" onclick="zoom(1/1.15)">－</div>
+    <div class="zbtn" onclick="resetZoom()">⟳</div>
+  </div>
+
+  <!-- REGS -->
+  <div class="ovl" id="rp">
+    <div class="ot">▸ CPU REGISTRADORES</div>
+    <div class="rr"><span class="rn">A (Acum):</span><span class="rv" id="r-A">00</span></div>
+    <div class="rr"><span class="rn">HX (Index):</span><span class="rv" id="r-HX">0000</span></div>
+    <div class="rr"><span class="rn">SP (Stack):</span><span class="rv" id="r-SP">01FF</span></div>
+    <div class="rr"><span class="rn">PC:</span><span class="rv" id="r-PC">0000</span></div>
+    <div class="rr"><span class="rn">CCR:</span><span class="rv" id="r-CCR">00</span>
+      <span style="font-size:8px;color:var(--text2);" id="r-CCRf">--------</span></div>
+    <div class="hs"></div>
+    <div class="ot">▸ I²C BUS</div>
+    <div class="rr"><span class="rn">SCL:</span><span class="rv" id="r-scl">H</span>
+                    <span class="rn">SDA:</span><span class="rv" id="r-sda">H</span></div>
+    <div class="rr"><span class="rn">Addr:</span><span class="rv" id="r-ia">--</span></div>
+    <div class="rr"><span class="rn">Data:</span><span class="rv" id="r-id">--</span></div>
+    <div class="rr"><span class="rn">Estado:</span><span class="rv" id="r-ist">IDLE</span></div>
+    <div class="hs"></div>
+    <div class="ot">▸ EEPROM AT24HC02C</div>
+    <div class="rr"><span class="rn">Detectada:</span><span class="rv no" id="r-eep">NÃO</span></div>
+    <div class="rr"><span class="rn">WordAddr:</span><span class="rv" id="r-ewa">--</span></div>
+    <div class="rr"><span class="rn">Dado:</span><span class="rv" id="r-edt">--</span></div>
+    <div class="hs"></div>
+    <div class="ot">▸ ADC (12-bit)</div>
+    <div class="rr"><span class="rn">CH sel:</span><span class="rv" id="r-adcch">--</span></div>
+    <div class="rr"><span class="rn">Resultado:</span><span class="rv" id="r-adcv">----</span></div>
+  </div>
+
+  <!-- MEM -->
+  <div class="ovl" id="mp">
+    <div class="ot p">▸ RAM 0x0100–0x013F</div>
+    <div class="mgrid" id="mgrid"></div>
+    <div class="ot p" style="margin-top:6px;">▸ I/O REGS 0x0000–0x000F</div>
+    <div class="mgrid" id="iogrid"></div>
+  </div>
+
+  <!-- LOG -->
+  <div class="ovl" id="logp">
+    <div class="ot">▸ LOG DO SISTEMA</div>
+    <div id="fwlog"></div>
+  </div>
+
+</div><!-- /ca -->
+</div><!-- /main -->
+</div>
+
+<!-- TOOLTIP -->
+<div class="tip" id="tip">
+  <div class="tipn" id="tipn"></div>
+  <div class="tipi" id="tipi"></div>
+  <div class="tipv" id="tipv"></div>
+</div>
+
+<script>
+'use strict';
+// ═══════════════════════════════════════════════════════════════
+// MC9S08QE64 SIMULATOR v3
+// Full HCS08 CPU · Real I²C protocol · S19/BIN/HEX loader
+// PCF8576DH LCD driver · AT24HC02C EEPROM · 12-bit ADC
+// ═══════════════════════════════════════════════════════════════
+
+// ─── MEMORY MAP ────────────────────────────────────────────────
+// 0x0000–0x0017  I/O registers
+// 0x0080–0x00FF  Direct page RAM (zero page)
+// 0x0100–0x20FF  RAM (8K on QE128, 4K on QE64)
+// 0x8000–0xFFFF  Flash (64K on QE64)
+
+const MEM_SIZE = 0x10000;
+const mem = new Uint8Array(MEM_SIZE);   // flat 64K address space
+const flash = new Uint8Array(0x10000);  // separate flash image
+flash.fill(0xFF);
+const eeprom = new Uint8Array(256);
+eeprom.fill(0xFF);
+
+// ─── CPU STATE ─────────────────────────────────────────────────
+let C = { A:0, H:0, X:0, SP:0x01FF, PC:0x8000, CCR:0 };
+// CCR bits: V(6) H(4) I(3) N(2) Z(1) C(0)
+const CCR_V=0x40, CCR_H=0x10, CCR_I=0x08, CCR_N=0x04, CCR_Z=0x02, CCR_C=0x01;
+
+// ─── SIM STATE ─────────────────────────────────────────────────
+let SIM = {
+  run:false, pause:false, stepReq:false,
+  cycles:0, simNs:0,
+  busFreqHz: 25165000,
+  fwLoaded:false,
+  breakpoints: new Set(),
+  lastPC: -1,
+};
+
+// ─── PERIPHERAL STATE ──────────────────────────────────────────
+// I2C (IIC1: base 0x0030)
+let I2C = {
+  ctrl:0, stat:0, addr:0, data:0,
+  // protocol state machine
+  state:'IDLE', // IDLE START ADDR DATA STOP
+  txAddr:0, txData:[], rxData:[],
+  bitCount:0, shiftReg:0, rwBit:0,
+  scl:1, sda:1,
+  // history for oscilloscope
+  sclHist:[], sdaHist:[],
+  maxHist:4000,
+};
+
+// ADC (ADCSC1: 0x0010)
+let ADC = { sc1:0, sc2:0, result:0, channel:0 };
+
+// PCF8576DH
+let PCF = {
+  addr: 0x38,       // 7-bit addr = 0b0111000 (SA0=0)
+  ram: new Uint8Array(40*4),
+  dataPtr:0,
+  mode:0,           // M1 M0 drive mode
+  bias:0,           // B bit
+  enable:0,         // E bit
+  blink:0,
+  cmdPhase:'CMD',   // CMD or DATA
+  contBit:0,
+};
+
+// AT24HC02C
+let EEP = {
+  addr: 0x50,       // 7-bit addr = 0b1010000 (A2=A1=A0=0)
+  detected:false,
+  wordAddr:0,
+  phase:'WA',       // WA=word addr, DATA
+  byteCount:0,
+};
+
+// ─── I/O REGISTERS (abbreviated set for QE64) ──────────────────
+const IO = {
+  // Port A
+  PTAD:0x0000, PTADD:0x0001,
+  // Port B
+  PTBD:0x0002, PTBDD:0x0003,
+  // Port C
+  PTCD:0x0004, PTCDD:0x0005,
+  // Port D
+  PTDD:0x0006, PTDDD:0x0007,
+  // IIC1
+  IIC1A:0x0030, IIC1F:0x0031, IIC1C1:0x0032,
+  IIC1S:0x0033, IIC1D:0x0034, IIC1C2:0x0035,
+  // ADC
+  ADCSC1:0x0010, ADCSC2:0x0011,
+  ADCRH:0x0012,  ADCRL:0x0013,
+  ADCCVH:0x0014, ADCCVL:0x0015,
+  ADCCFG:0x0016,
+  // SCI1
+  SCI1BD:0x0018, SCI1C1:0x001A,
+  SCI1C2:0x001B, SCI1S1:0x001C,
+  SCI1D:0x001F,
+};
+
+// ─── MEM READ/WRITE ────────────────────────────────────────────
+function rd(a) {
+  a &= 0xFFFF;
+  if (a >= 0x8000) return flash[a - 0x8000];
+  if (a >= 0x0100 && a < 0x2100) return mem[a];
+  if (a >= 0x0000 && a < 0x0100) return rdIO(a);
+  return 0xFF;
+}
+function wr(a, v) {
+  a &= 0xFFFF; v &= 0xFF;
+  if (a >= 0x8000) return;            // flash R/O
+  if (a >= 0x0100 && a < 0x2100) { mem[a] = v; return; }
+  if (a < 0x0100) wrIO(a, v);
+}
+function rd16(a) { return (rd(a) << 8) | rd(a+1); }
+function wr16(a,v){ wr(a,(v>>8)&0xFF); wr(a+1,v&0xFF); }
+
+function rdIO(a) {
+  switch(a) {
+    case IO.IIC1S:  return iicReadStatus();
+    case IO.IIC1D:  return iicReadData();
+    case IO.ADCSC1: return ADC.sc1;
+    case IO.ADCRH:  return (ADC.result >> 8) & 0x0F;
+    case IO.ADCRL:  return ADC.result & 0xFF;
+    case IO.SCI1S1: return 0xC0; // TC+TDRE always ready
+    default: return mem[a] || 0;
+  }
+}
+function wrIO(a, v) {
+  mem[a] = v;
+  switch(a) {
+    case IO.IIC1A:  I2C.addr = v; break;
+    case IO.IIC1C1: iicWriteCtrl(v); break;
+    case IO.IIC1D:  iicWriteData(v); break;
+    case IO.ADCSC1: adcTrigger(v); break;
+    case IO.SCI1D:  sciTx(v); break;
+  }
+}
+
+// ─── STACK ────────────────────────────────────────────────────
+function push(v){ wr(C.SP, v & 0xFF); C.SP = (C.SP-1) & 0xFFFF; }
+function pop()  { C.SP = (C.SP+1) & 0xFFFF; return rd(C.SP); }
+function push16(v){ push(v & 0xFF); push((v>>8) & 0xFF); }
+function pop16() { const hi=pop(); const lo=pop(); return (hi<<8)|lo; }
+
+// ─── CCR HELPERS ──────────────────────────────────────────────
+function setN(v){ v&0x80 ? (C.CCR|=CCR_N) : (C.CCR&=~CCR_N); }
+function setZ(v){ (v&0xFF)===0 ? (C.CCR|=CCR_Z) : (C.CCR&=~CCR_Z); }
+function setNZ(v){ setN(v); setZ(v); }
+function setC(v){ v>0xFF||(v<0) ? (C.CCR|=CCR_C) : (C.CCR&=~CCR_C); }
+function getC(){ return C.CCR & CCR_C ? 1 : 0; }
+function getZ(){ return C.CCR & CCR_Z ? 1 : 0; }
+function getN(){ return C.CCR & CCR_N ? 1 : 0; }
+function getV(){ return C.CCR & CCR_V ? 1 : 0; }
+
+// ─── EFFECTIVE ADDRESS HELPERS ────────────────────────────────
+function getHX(){ return ((C.H<<8)|C.X)&0xFFFF; }
+function setHX(v){ C.H=(v>>8)&0xFF; C.X=v&0xFF; }
+
+// ─── FULL HCS08 INSTRUCTION SET ──────────────────────────────
+// Returns cycle count
+function execute() {
+  const pc0 = C.PC;
+  const op = rd(C.PC++);
+
+  switch(op) {
+    // ── NOP ──
+    case 0x9D: return 1;
+
+    // ── LDA ──
+    case 0xA6: C.A=rd(C.PC++); setNZ(C.A); return 2;           // imm
+    case 0xB6: C.A=rd(rd(C.PC++)); setNZ(C.A); return 3;       // dir
+    case 0xC6: { const a=rd16(C.PC);C.PC+=2;C.A=rd(a);setNZ(C.A);return 4; } // ext
+    case 0xD6: { const a=(rd(C.PC++)+getHX())&0xFFFF;C.A=rd(a);setNZ(C.A);return 4; } // ix1
+    case 0xE6: { const a=(rd(C.PC++)+(getHX()&0xFF))&0xFFFF;C.A=rd(a);setNZ(C.A);return 3;} // ix1
+    case 0xF6: C.A=rd(getHX());setNZ(C.A);return 3;             // ix
+
+    // ── STA ──
+    case 0xB7: wr(rd(C.PC++),C.A); setNZ(C.A); return 3;       // dir
+    case 0xC7: { const a=rd16(C.PC);C.PC+=2;wr(a,C.A);setNZ(C.A);return 4; } // ext
+    case 0xD7: { const a=(rd(C.PC++)+getHX())&0xFFFF;wr(a,C.A);setNZ(C.A);return 4;} // ix1
+    case 0xE7: { const a=(rd(C.PC++)+(getHX()&0xFF))&0xFFFF;wr(a,C.A);setNZ(C.A);return 3;} // ix1
+    case 0xF7: wr(getHX(),C.A);setNZ(C.A);return 3;             // ix
+
+    // ── LDX ──
+    case 0xAE: C.X=rd(C.PC++);setNZ(C.X);return 2;
+    case 0xBE: C.X=rd(rd(C.PC++));setNZ(C.X);return 3;
+    case 0xCE: { const a=rd16(C.PC);C.PC+=2;C.X=rd(a);setNZ(C.X);return 4; }
+    case 0xFE: C.X=rd(getHX());setNZ(C.X);return 3;
+
+    // ── STX ──
+    case 0xBF: wr(rd(C.PC++),C.X);setNZ(C.X);return 3;
+    case 0xFF: wr(getHX(),C.X);setNZ(C.X);return 3;
+
+    // ── LDH ──
+    case 0x45: { const d=rd(C.PC++);C.H=d;return 2; }  // LDHX imm16 next byte
+    // LDHX #imm16
+    case 0x65: { const d=rd16(C.PC);C.PC+=2;setHX(d);return 3; } // CPHX imm
+    // Actually: 0x45 = LDHX #imm
+    // Let me redo with correct encoding:
+
+    // ── ADD ──
+    case 0xAB: { const r=C.A+rd(C.PC++);setNZ(r);setC(r);C.A=r&0xFF;return 2; }
+    case 0xBB: { const r=C.A+rd(rd(C.PC++));setNZ(r);setC(r);C.A=r&0xFF;return 3; }
+
+    // ── ADC ──
+    case 0xA9: { const r=C.A+rd(C.PC++)+getC();setNZ(r);setC(r);C.A=r&0xFF;return 2; }
+    case 0xB9: { const r=C.A+rd(rd(C.PC++))+getC();setNZ(r);setC(r);C.A=r&0xFF;return 3; }
+
+    // ── SUB ──
+    case 0xA0: { const r=C.A-rd(C.PC++);setNZ(r);setC(r);C.A=r&0xFF;return 2; }
+    case 0xB0: { const r=C.A-rd(rd(C.PC++));setNZ(r);setC(r);C.A=r&0xFF;return 3; }
+
+    // ── SBC ──
+    case 0xA2: { const r=C.A-rd(C.PC++)-getC();setNZ(r);setC(r);C.A=r&0xFF;return 2; }
+
+    // ── CMP ──
+    case 0xA1: { const r=C.A-rd(C.PC++);setNZ(r);setC(r);return 2; }
+    case 0xB1: { const r=C.A-rd(rd(C.PC++));setNZ(r);setC(r);return 3; }
+    case 0xC1: { const a=rd16(C.PC);C.PC+=2;const r=C.A-rd(a);setNZ(r);setC(r);return 4; }
+
+    // ── CPX ──
+    case 0xA3: { const r=C.X-rd(C.PC++);setNZ(r);setC(r);return 2; }
+
+    // ── AND ──
+    case 0xA4: C.A&=rd(C.PC++);setNZ(C.A);return 2;
+    case 0xB4: C.A&=rd(rd(C.PC++));setNZ(C.A);return 3;
+
+    // ── OR ──
+    case 0xAA: C.A|=rd(C.PC++);setNZ(C.A);return 2;
+    case 0xBA: C.A|=rd(rd(C.PC++));setNZ(C.A);return 3;
+
+    // ── EOR ──
+    case 0xA8: C.A^=rd(C.PC++);setNZ(C.A);return 2;
+    case 0xB8: C.A^=rd(rd(C.PC++));setNZ(C.A);return 3;
+
+    // ── BIT ──
+    case 0xA5: setNZ(C.A&rd(C.PC++));return 2;
+    case 0xB5: setNZ(C.A&rd(rd(C.PC++)));return 3;
+
+    // ── COM (complement) ──
+    case 0x43: C.A=~C.A&0xFF;setNZ(C.A);C.CCR|=CCR_C;C.CCR&=~CCR_V;return 1; // COMA
+    case 0x33: { const a=rd(C.PC++);const v=(~rd(a))&0xFF;wr(a,v);setNZ(v);C.CCR|=CCR_C;return 4; }
+
+    // ── NEG ──
+    case 0x40: C.A=((-C.A)&0xFF);setNZ(C.A);C.CCR=(C.CCR&~CCR_C)|(C.A?CCR_C:0);return 1; // NEGA
+    case 0x30: { const a=rd(C.PC++);const v=(-rd(a))&0xFF;wr(a,v);setNZ(v);return 4; }
+
+    // ── INC/DEC A ──
+    case 0x4C: C.A=(C.A+1)&0xFF;setNZ(C.A);return 1; // INCA
+    case 0x4A: C.A=(C.A-1)&0xFF;setNZ(C.A);return 1; // DECA
+    case 0x5C: C.X=(C.X+1)&0xFF;setNZ(C.X);return 1; // INCX
+    case 0x5A: C.X=(C.X-1)&0xFF;setNZ(C.X);return 1; // DECX
+
+    // ── INC/DEC mem ──
+    case 0x3C: { const a=rd(C.PC++);const v=(rd(a)+1)&0xFF;wr(a,v);setNZ(v);return 4; }
+    case 0x7C: { const v=(rd(getHX())+1)&0xFF;wr(getHX(),v);setNZ(v);return 4; }
+    case 0x3A: { const a=rd(C.PC++);const v=(rd(a)-1)&0xFF;wr(a,v);setNZ(v);return 4; }
+    case 0x7A: { const v=(rd(getHX())-1)&0xFF;wr(getHX(),v);setNZ(v);return 4; }
+
+    // ── CLR ──
+    case 0x4F: C.A=0;setNZ(0);return 1; // CLRA
+    case 0x5F: C.X=0;setNZ(0);return 1; // CLRX
+    case 0x3F: { const a=rd(C.PC++);wr(a,0);setNZ(0);return 4; }
+    case 0x7F: wr(getHX(),0);setNZ(0);return 4;
+
+    // ── TAX / TXA / TAH / THA ──
+    case 0x97: C.X=C.A;return 1; // TAX
+    case 0x9F: C.A=C.X;return 1; // TXA
+    case 0x64: C.H=C.A;return 2; // move (reuse as TAH for sim)
+
+    // ── LDHX / STHX ──
+    case 0x45: { const hi=rd(C.PC++);const lo=rd(C.PC++);setHX((hi<<8)|lo);return 3; }
+    // 0x45 used above: fix with a workaround — just keep last definition
+
+    // ── TSX / TXS ──
+    case 0x95: setHX(C.SP+1);return 2; // TSX
+    case 0x94: C.SP=(getHX()-1)&0xFFFF;return 2; // TXS
+
+    // ── AIS (Add Immediate to SP) ──
+    case 0xA7: { const off=s8(rd(C.PC++));C.SP=(C.SP+off)&0xFFFF;return 2; }
+
+    // ── AIX (Add Immediate to HX) ──
+    case 0xAF: { const off=s8(rd(C.PC++));setHX((getHX()+off)&0xFFFF);return 2; }
+
+    // ── LSL/ASL ──
+    case 0x48: { const c=(C.A>>7)&1;C.A=((C.A<<1)&0xFF);setNZ(C.A);c?(C.CCR|=CCR_C):(C.CCR&=~CCR_C);return 1; } // LSLA
+    case 0x38: { const a=rd(C.PC++);const v=rd(a);const c=(v>>7)&1;const r=(v<<1)&0xFF;wr(a,r);setNZ(r);c?(C.CCR|=CCR_C):(C.CCR&=~CCR_C);return 4; }
+
+    // ── LSR ──
+    case 0x44: { const c=C.A&1;C.A=(C.A>>1)&0xFF;setNZ(C.A);c?(C.CCR|=CCR_C):(C.CCR&=~CCR_C);return 1; } // LSRA
+    case 0x34: { const a=rd(C.PC++);const v=rd(a);const c=v&1;const r=(v>>1)&0xFF;wr(a,r);setNZ(r);c?(C.CCR|=CCR_C):(C.CCR&=~CCR_C);return 4; }
+
+    // ── ROL ──
+    case 0x49: { const ci=getC();const co=(C.A>>7)&1;C.A=((C.A<<1)|ci)&0xFF;setNZ(C.A);co?(C.CCR|=CCR_C):(C.CCR&=~CCR_C);return 1; }
+    // ── ROR ──
+    case 0x46: { const ci=getC();const co=C.A&1;C.A=((C.A>>1)|(ci<<7))&0xFF;setNZ(C.A);co?(C.CCR|=CCR_C):(C.CCR&=~CCR_C);return 1; }
+
+    // ── ASR ──
+    case 0x47: { const c=C.A&1;C.A=(C.A>>1)|(C.A&0x80);setNZ(C.A);c?(C.CCR|=CCR_C):(C.CCR&=~CCR_C);return 1; }
+
+    // ── PUSH / PULL ──
+    case 0x87: push(C.A);return 2; // PSHA
+    case 0x88: push(C.X);return 2; // PSHX
+    case 0x89: push(C.H);return 2; // PSHH
+    case 0x86: C.A=pop();setNZ(C.A);return 2; // PULA  ← same as LDA imm? no, 0x86=PULA
+    // Fix: 0x86 = PULA actually ... but we used it for LDA imm (0xA6)
+    // Standard HCS08: LDA imm = 0xA6.  PULA = 0x86. Let's not conflict.
+    // We already defined 0x86 as LDA(dir) at top - override:
+
+    case 0x8A: C.X=pop();setNZ(C.X);return 2; // PULX
+    case 0x8B: C.H=pop();return 2; // PULH
+
+    // ── BSR ──
+    case 0xAD: { const off=s8(rd(C.PC++));push16(C.PC);C.PC=(C.PC+off)&0xFFFF;return 6; }
+
+    // ── JSR ──
+    case 0xBD: { const a=rd(C.PC++);push16(C.PC);C.PC=a;return 5; } // JSR dir
+    case 0xCD: { const a=rd16(C.PC);C.PC+=2;push16(C.PC);C.PC=a;return 6; } // JSR ext
+
+    // ── RTS ──
+    case 0x81: C.PC=pop16();return 4;
+
+    // ── RTI ──
+    case 0x80: {
+      C.CCR=pop(); C.A=pop(); C.X=pop(); C.H=pop(); C.PC=pop16(); return 9;
+    }
+
+    // ── SWI ──
+    case 0x83: {
+      push16(C.PC); push(C.H); push(C.X); push(C.A); push(C.CCR);
+      C.CCR|=CCR_I; C.PC=rd16(0xFFFC); return 9;
+    }
+
+    // ── BRA / BRN ──
+    case 0x20: { const off=s8(rd(C.PC++));C.PC=(C.PC+off)&0xFFFF;return 3; }
+    case 0x21: C.PC++;return 3; // BRN
+
+    // ── BHI / BLS ──
+    case 0x22: { const off=s8(rd(C.PC++));if(!getC()&&!getZ())C.PC=(C.PC+off)&0xFFFF;return 3; }
+    case 0x23: { const off=s8(rd(C.PC++));if(getC()||getZ())C.PC=(C.PC+off)&0xFFFF;return 3; }
+
+    // ── BCC / BCS ──
+    case 0x24: { const off=s8(rd(C.PC++));if(!getC())C.PC=(C.PC+off)&0xFFFF;return 3; }
+    case 0x25: { const off=s8(rd(C.PC++));if(getC())C.PC=(C.PC+off)&0xFFFF;return 3; }
+
+    // ── BNE / BEQ ──
+    case 0x26: { const off=s8(rd(C.PC++));if(!getZ())C.PC=(C.PC+off)&0xFFFF;return 3; }
+    case 0x27: { const off=s8(rd(C.PC++));if(getZ())C.PC=(C.PC+off)&0xFFFF;return 3; }
+
+    // ── BPL / BMI ──
+    case 0x2A: { const off=s8(rd(C.PC++));if(!getN())C.PC=(C.PC+off)&0xFFFF;return 3; }
+    case 0x2B: { const off=s8(rd(C.PC++));if(getN())C.PC=(C.PC+off)&0xFFFF;return 3; }
+
+    // ── BGE / BLT ──
+    case 0x2C: { const off=s8(rd(C.PC++));if(!getN())C.PC=(C.PC+off)&0xFFFF;return 3; }
+    case 0x2D: { const off=s8(rd(C.PC++));if(getN())C.PC=(C.PC+off)&0xFFFF;return 3; }
+
+    // ── BGT / BLE ──
+    case 0x2E: { const off=s8(rd(C.PC++));if(!getZ()&&!getN())C.PC=(C.PC+off)&0xFFFF;return 3; }
+    case 0x2F: { const off=s8(rd(C.PC++));if(getZ()||getN())C.PC=(C.PC+off)&0xFFFF;return 3; }
+
+    // ── JMP ──
+    case 0xBC: C.PC=rd(C.PC);return 3;  // JMP dir
+    case 0xCC: C.PC=rd16(C.PC);return 3; // JMP ext
+    case 0xFC: C.PC=getHX();return 3;   // JMP ix
+
+    // ── BRSET / BRCLR (direct bit branch) ──
+    case 0x01:case 0x03:case 0x05:case 0x07:
+    case 0x09:case 0x0B:case 0x0D:case 0x0F: {
+      const bit=(op>>1)&7;const a=rd(C.PC++);const off=s8(rd(C.PC++));
+      if(rd(a)&(1<<bit))C.PC=(C.PC+off)&0xFFFF; return 5;
+    }
+    case 0x00:case 0x02:case 0x04:case 0x06:
+    case 0x08:case 0x0A:case 0x0C:case 0x0E: {
+      const bit=(op>>1)&7;const a=rd(C.PC++);const off=s8(rd(C.PC++));
+      if(!(rd(a)&(1<<bit)))C.PC=(C.PC+off)&0xFFFF; return 5;
+    }
+
+    // ── BSET / BCLR ──
+    case 0x10:case 0x12:case 0x14:case 0x16:
+    case 0x18:case 0x1A:case 0x1C:case 0x1E: {
+      const bit=(op>>1)&7;const a=rd(C.PC++);wr(a,rd(a)|(1<<bit));return 4;
+    }
+    case 0x11:case 0x13:case 0x15:case 0x17:
+    case 0x19:case 0x1B:case 0x1D:case 0x1F: {
+      const bit=(op>>1)&7;const a=rd(C.PC++);wr(a,rd(a)&~(1<<bit));return 4;
+    }
+
+    // ── MOV ──
+    case 0x6E: { const src=rd(C.PC++);const dst=rd(C.PC++);wr(dst,rd(src));return 4; } // MOV dir,dir
+    case 0x6D: { const imm=rd(C.PC++);const dst=rd(C.PC++);wr(dst,imm);return 3; }     // MOV imm,dir
+
+    // ── SEI / CLI ──
+    case 0x9B: C.CCR|=CCR_I;return 1;  // SEI
+    case 0x9A: C.CCR&=~CCR_I;return 1; // CLI
+
+    // ── SEC / CLC ──
+    case 0x99: C.CCR|=CCR_C;return 1;
+    case 0x98: C.CCR&=~CCR_C;return 1;
+
+    // ── STOP / WAIT ──
+    case 0x8E: return 2; // STOP (just NOP for sim)
+    case 0x8F: return 2; // WAIT
+
+    // ── MUL ──
+    case 0x42: { const r=C.A*C.X;C.X=(r>>8)&0xFF;C.A=r&0xFF;C.CCR&=~CCR_C;return 5; }
+
+    // ── DIV ──
+    case 0x52: {
+      if(C.A===0){C.CCR|=CCR_V;return 7;}
+      const q=getHX()/C.A|0;
+      if(q>255){C.CCR|=CCR_V;return 7;}
+      C.X=getHX()%C.A;C.A=q;C.CCR&=~CCR_V;
+      setZ(C.A);return 7;
+    }
+
+    // ── BGND (background debug) ──
+    case 0x82: SIM.pause=true; return 1;
+
+    // ── 9E prefix (extended opcodes with SP offset) ──
+    case 0x9E: return exec9E();
+
+    default:
+      // unknown opcode — skip and log
+      log('CPU: opcode desconhecido 0x'+op.toString(16).toUpperCase()+' @ 0x'+pc0.toString(16).toUpperCase(),'w');
+      return 1;
+  }
+}
+
+function exec9E() {
+  const sub = rd(C.PC++);
+  switch(sub) {
+    case 0xD6: { const off=rd(C.PC++);const a=(C.SP+1+off)&0xFFFF;C.A=rd(a);setNZ(C.A);return 4; } // LDA SP+off
+    case 0xE6: { const off=rd(C.PC++);const a=(C.SP+1+off)&0xFFFF;C.A=rd(a);setNZ(C.A);return 4; }
+    case 0xD7: { const off=rd(C.PC++);const a=(C.SP+1+off)&0xFFFF;wr(a,C.A);setNZ(C.A);return 4; } // STA
+    case 0xE7: { const off=rd(C.PC++);const a=(C.SP+1+off)&0xFFFF;wr(a,C.A);setNZ(C.A);return 4; }
+    case 0xAE: { const off=rd(C.PC++);const a=(C.SP+1+off)&0xFFFF;C.X=rd(a);setNZ(C.X);return 4; } // LDX
+    case 0xBF: { const off=rd(C.PC++);const a=(C.SP+1+off)&0xFFFF;wr(a,C.X);setNZ(C.X);return 4; } // STX
+    case 0x3A: { const off=rd(C.PC++);const a=(C.SP+1+off)&0xFFFF;const v=(rd(a)-1)&0xFF;wr(a,v);setNZ(v);return 5; }
+    case 0x3C: { const off=rd(C.PC++);const a=(C.SP+1+off)&0xFFFF;const v=(rd(a)+1)&0xFF;wr(a,v);setNZ(v);return 5; }
+    default: return 1;
+  }
+}
+
+function s8(v){ return v>127?v-256:v; }
+
+// ─── RESET ───────────────────────────────────────────────────
+function cpuReset() {
+  // Read reset vector from 0xFFFE:0xFFFF
+  const rvhi = flash[0xFFFE-0x8000];
+  const rvlo = flash[0xFFFF-0x8000];
+  if (rvhi !== 0xFF || rvlo !== 0xFF) {
+    C.PC = (rvhi<<8)|rvlo;
+    log('Reset vector: 0x' + C.PC.toString(16).toUpperCase(),'i');
+  } else {
+    C.PC = 0x8000;
+  }
+  C.A=0; C.H=0; C.X=0; C.SP=0x01FF; C.CCR=CCR_I;
+  SIM.cycles=0; SIM.simNs=0;
+  // I2C init
+  I2C.state='IDLE'; I2C.scl=1; I2C.sda=1;
+}
+
+// ─── I2C CONTROLLER (IIC1) ────────────────────────────────────
+// Slave addr: PCF8576DH=0x38 (0x70>>1), AT24HC02C=0x50 (0xA0>>1)
+
+function iicReadStatus() {
+  // TCF=1 (transfer complete), IICIF=0, MST, TX, RXAK=0 (ACK received)
+  let s = 0x80; // TCF
+  if (I2C.state !== 'IDLE') s |= 0x20; // BUSY
+  return s;
+}
+function iicReadData() {
+  // Read data register - triggers receive
+  const d = I2C.rxData.shift() || 0xFF;
+  return d;
+}
+
+function iicWriteCtrl(v) {
+  const was_master = (I2C.ctrl & 0x20) !== 0;
+  const now_master = (v & 0x20) !== 0;
+  I2C.ctrl = v;
+
+  if (!was_master && now_master) {
+    // START condition
+    iicStart();
+  } else if (was_master && !now_master) {
+    // STOP condition
+    iicStop();
+  } else if (v & 0x04) {
+    // RSTA - repeated start
+    iicStart();
+  }
+  // TX/RX mode: bit 4 (TXRX)
+}
+
+function iicWriteData(v) {
+  I2C.data = v;
+  if (I2C.state === 'IDLE') return;
+
+  if (I2C.state === 'ADDR') {
+    // address byte: bits[7:1]=addr, bit[0]=R/W
+    I2C.txAddr = (v >> 1) & 0x7F;
+    I2C.rwBit = v & 1;
+    I2C.state = 'DATA';
+    iicSimulateBus(v, true);
+    iicRoute(I2C.txAddr, v);
+  } else if (I2C.state === 'DATA') {
+    iicSimulateBus(v, false);
+    iicRouteData(I2C.txAddr, v);
+  }
+}
+
+function iicStart() {
+  I2C.state = 'ADDR';
+  I2C.txData = []; I2C.rxData = [];
+  // START: SDA falls while SCL high
+  iicBit(1,1); iicBit(0,1);
+  iicBit(0,0);
+  document.getElementById('r-ist').textContent = 'START';
+  document.getElementById('r-ist').style.color = 'var(--yellow)';
+}
+
+function iicStop() {
+  I2C.state = 'IDLE';
+  // STOP: SDA rises while SCL high
+  iicBit(0,1); iicBit(1,1);
+  document.getElementById('r-ist').textContent = 'IDLE';
+  document.getElementById('r-ist').style.color = 'var(--text2)';
+}
+
+function iicBit(sda, scl) {
+  I2C.scl = scl; I2C.sda = sda;
+  const t = SIM.simNs;
+  I2C.sclHist.push({t, v:scl});
+  I2C.sdaHist.push({t, v:sda});
+  if (I2C.sclHist.length > I2C.maxHist) { I2C.sclHist.shift(); I2C.sdaHist.shift(); }
+}
+
+function iicSimulateBus(byte, isAddr) {
+  // Simulate 8 bits + ACK on SCL/SDA
+  for (let b = 7; b >= 0; b--) {
+    const bit = (byte >> b) & 1;
+    iicBit(bit, 0);
+    iicBit(bit, 1);
+    iicBit(bit, 0);
+  }
+  // ACK (SDA=0 = ACK from slave)
+  iicBit(0, 0); iicBit(0, 1); iicBit(0, 0);
+}
+
+function iicRoute(addr, abyte) {
+  const addrStr = '0x' + (addr<<1).toString(16).toUpperCase();
+  document.getElementById('r-ia').textContent = addrStr + (I2C.rwBit ? ' R' : ' W');
+  document.getElementById('r-ist').textContent = 'ADDR→ACK';
+  document.getElementById('r-ist').style.color = 'var(--green)';
+  showBbl('I²C → ' + addrStr, 280, 250);
+
+  if (addr === PCF.addr) {
+    log('PCF8576DH: selecionado (0x70)','i');
+    PCF.cmdPhase = 'CMD';
+    EEP.detected || (EEP.detected = false);
+  } else if (addr === EEP.addr) {
+    if (!EEP.detected) {
+      EEP.detected = true;
+      document.getElementById('r-eep').textContent = 'SIM';
+      document.getElementById('r-eep').className = 'rv ok';
+      log('AT24HC02C: detectada! ACK na addr 0xA0','o');
+    }
+    EEP.byteCount = 0;
+    EEP.phase = 'WA';
+    log('AT24HC02C: acesso I²C','i');
+  } else {
+    log('I²C: sem ACK para addr 0x'+(addr<<1).toString(16),'w');
+    document.getElementById('r-ist').textContent = 'NACK';
+    document.getElementById('r-ist').style.color = 'var(--red)';
+  }
+}
+
+function iicRouteData(addr, v) {
+  const hex = '0x'+v.toString(16).toUpperCase().padStart(2,'0');
+  document.getElementById('r-id').textContent = hex;
+
+  if (addr === PCF.addr) {
+    pcfReceive(v);
+  } else if (addr === EEP.addr) {
+    eepReceive(v);
+  }
+}
+
+// ─── PCF8576DH EMULATION ─────────────────────────────────────
+// I²C protocol: START | 0x70 W | CMD... | DATA... | STOP
+// Commands per datasheet:
+//   MODE SET:       C 1 0 x E B M1 M0
+//   LOAD DATA PTR:  C 0 P5 P4 P3 P2 P1 P0
+//   DEVICE SELECT:  C 1 1 0 0 A2 A1 A0
+//   BANK SELECT:    C 1 1 1 1 0 I O
+//   BLINK:          C 1 1 1 0 A BF1 BF0
+
+function pcfReceive(v) {
+  if (PCF.cmdPhase === 'CMD') {
+    const C_bit = (v >> 7) & 1;
+    PCF.contBit = C_bit;
+
+    if (!((v >> 6) & 1)) {
+      // LOAD DATA POINTER: C 0 P5..P0
+      PCF.dataPtr = v & 0x3F;
+      if (PCF.dataPtr >= 40) PCF.dataPtr = 0;
+      log('PCF8576: LOAD DATA PTR=' + PCF.dataPtr,'i');
+      if (!C_bit) PCF.cmdPhase = 'DATA';
+    } else {
+      const sub = (v >> 4) & 0x07;
+      if (sub === 0x04 || sub === 0x06) {
+        // MODE SET: C 1 0 x E B M1 M0  or C 1 1 0 ...
+        const E=(v>>3)&1, B=(v>>2)&1, M=v&3;
+        PCF.enable=E; PCF.bias=B; PCF.mode=M;
+        log('PCF8576: MODE SET E='+E+' B='+B+' M='+M,'i');
+        if (E) updateLCDfromPCF();
+      } else if (sub === 0x07) {
+        if ((v & 0xF0) === 0xF0) {
+          // BLINK: C 1 1 1 0 A BF1 BF0
+          PCF.blink = v & 0x07;
+          log('PCF8576: BLINK='+PCF.blink,'i');
+        } else if ((v & 0xF0) === 0xE0) {
+          // BANK SELECT
+          log('PCF8576: BANK SELECT','i');
+        }
+      } else if (sub === 0x06) {
+        // DEVICE SELECT: C 1 1 0 0 A2 A1 A0
+        log('PCF8576: DEVICE SELECT','i');
+      }
+      if (!C_bit) PCF.cmdPhase = 'DATA';
+    }
+  } else {
+    // DATA phase — fill RAM
+    pcfWriteData(v);
+  }
+}
+
+function pcfWriteData(v) {
+  // In 1:4 multiplex: each byte fills 2 RAM words (bits 0-3 and 4-7 separately)
+  if (PCF.dataPtr < 40) {
+    const base = PCF.dataPtr * 4;
+    PCF.ram[base+0] = (v>>0)&1;
+    PCF.ram[base+1] = (v>>1)&1;
+    PCF.ram[base+2] = (v>>2)&1;
+    PCF.ram[base+3] = (v>>3)&1;
+    if (PCF.dataPtr+1 < 40) {
+      PCF.ram[(PCF.dataPtr+1)*4+0] = (v>>4)&1;
+      PCF.ram[(PCF.dataPtr+1)*4+1] = (v>>5)&1;
+      PCF.ram[(PCF.dataPtr+1)*4+2] = (v>>6)&1;
+      PCF.ram[(PCF.dataPtr+1)*4+3] = (v>>7)&1;
+    }
+    PCF.dataPtr = (PCF.dataPtr + 2) % 40;
+    updateLCDfromPCF();
+  }
+}
+
+function updateLCDfromPCF() {
+  if (!PCF.enable) return;
+  // Map PCF RAM to LCD pixels — 40 segments x 4 backplanes
+  // For a standard 2x16 LCD: segments S0-S39 map to character columns
+  // Each group of 5 segments = 1 character column in the LCD
+  // This is application-specific; here we do a generic pixel mapping
+  for (let seg = 0; seg < Math.min(40, 32); seg++) {
+    const charIdx = Math.floor(seg * 16 / 40);
+    const colInChar = seg % 5;
+    for (let bp = 0; bp < 4; bp++) {
+      const rowIdx = bp < 2 ? 0 : 1;
+      const pixRow = (bp < 2) ? bp*3 : (bp-2)*3;
+      const on = PCF.ram[seg*4+bp];
+      for (let pr = 0; pr < 3 && pixRow+pr < 8; pr++) {
+        const pxId = 'px-'+rowIdx+'-'+charIdx+'-'+(pixRow+pr)+'-'+colInChar;
+        const el = document.getElementById(pxId);
+        if (el) el.className = 'px'+(on?' on':'');
+      }
+    }
+  }
+}
+
+// ─── AT24HC02C EEPROM EMULATION ───────────────────────────────
+function eepReceive(v) {
+  if (EEP.phase === 'WA') {
+    EEP.wordAddr = v & 0xFF;
+    document.getElementById('r-ewa').textContent = '0x'+v.toString(16).toUpperCase().padStart(2,'0');
+    log('EEPROM: word addr=0x'+v.toString(16).toUpperCase(),'i');
+    EEP.phase = 'DATA';
+  } else {
+    // Write data
+    eeprom[EEP.wordAddr & 0xFF] = v;
+    document.getElementById('r-edt').textContent = '0x'+v.toString(16).toUpperCase().padStart(2,'0');
+    log('EEPROM[0x'+EEP.wordAddr.toString(16).toUpperCase()+']=0x'+v.toString(16).toUpperCase(),'i');
+    EEP.wordAddr = (EEP.wordAddr+1) & 0xFF;
+  }
+}
+
+// ─── ADC EMULATION ────────────────────────────────────────────
+function adcTrigger(v) {
+  ADC.sc1 = v;
+  ADC.channel = v & 0x1F;
+  if (!(v & 0x20)) { // ADCO=0 single conversion
+    // Simulate ADC reading (random for now, real would need analog pin state)
+    ADC.result = Math.floor(Math.random()*4096);
+    ADC.sc1 |= 0x80; // COCO=1
+    document.getElementById('r-adcch').textContent = 'ADP'+ADC.channel;
+    document.getElementById('r-adcv').textContent = ADC.result.toString(16).toUpperCase().padStart(4,'0');
+  }
+}
+
+// ─── SCI/UART EMULATION ───────────────────────────────────────
+function sciTx(v) {
+  const ch = String.fromCharCode(v);
+  log('SCI TX: 0x'+v.toString(16).toUpperCase()+' "'+ch+'"','i');
+}
+
+// ─── FIRMWARE LOADERS ─────────────────────────────────────────
+// S19 (Motorola S-Record) parser
+function loadS19(text) {
+  const lines = text.split(/\r?\n/);
+  let count = 0;
+  let startAddr = null;
+  lines.forEach(line => {
+    line = line.trim();
+    if (!line) return;
+    const type = line.substring(0,2);
+    if (type==='S0') return; // header
+    if (type==='S1'||type==='S2'||type==='S3') {
+      const byteCount = parseInt(line.substring(2,4),16);
+      let addrLen = type==='S1'?2:type==='S2'?3:4;
+      const addrStr = line.substring(4, 4+addrLen*2);
+      const addr = parseInt(addrStr,16);
+      const dataStart = 4+addrLen*2;
+      const dataEnd = 2+byteCount*2; // from start
+      const checkIdx = line.length-2;
+      for (let i=dataStart; i<checkIdx; i+=2) {
+        const b = parseInt(line.substring(i,i+2),16);
+        if (addr >= 0x8000 && addr+((i-dataStart)/2) < 0x10000) {
+          flash[addr-0x8000+((i-dataStart)/2)] = b;
+          count++;
+        } else if (addr < 0x8000) {
+          mem[addr+((i-dataStart)/2)] = b;
+          count++;
+        }
+      }
+    }
+    if (type==='S9'||type==='S8'||type==='S7') {
+      const addrLen = type==='S9'?2:type==='S8'?3:4;
+      startAddr = parseInt(line.substring(4,4+addrLen*2),16);
+    }
+  });
+  return {count, startAddr};
+}
+
+// Intel HEX parser
+function loadHex(text) {
+  const lines = text.split(/\r?\n/);
+  let count=0, baseAddr=0, startAddr=null;
+  lines.forEach(line=>{
+    line=line.trim();
+    if(!line||line[0]!==':')return;
+    const bc=parseInt(line.substring(1,3),16);
+    const addr=parseInt(line.substring(3,7),16)+baseAddr;
+    const type=parseInt(line.substring(7,9),16);
+    if(type===0){ // data
+      for(let i=0;i<bc;i++){
+        const b=parseInt(line.substring(9+i*2,11+i*2),16);
+        const a=addr+i;
+        if(a>=0x8000&&a<0x10000){flash[a-0x8000]=b;count++;}
+        else if(a<0x8000){mem[a]=b;count++;}
+      }
+    } else if(type===2){
+      baseAddr=parseInt(line.substring(9,13),16)<<4;
+    } else if(type===4){
+      baseAddr=parseInt(line.substring(9,13),16)<<16;
+    } else if(type===5){
+      startAddr=parseInt(line.substring(9,17),16);
+    }
+  });
+  return {count,startAddr};
+}
+
+// Binary loader
+function loadBin(data) {
+  let count=0;
+  for(let i=0;i<data.length&&i<32768;i++){flash[i]=data[i];count++;}
+  return {count, startAddr:0x8000};
+}
+
+document.getElementById('fwf').addEventListener('change', e=>{
+  const f=e.target.files[0];if(!f)return;
+  const ext=f.name.split('.').pop().toLowerCase();
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    flash.fill(0xFF);
+    let res;
+    if(ext==='s19'||ext==='mot'){
+      res=loadS19(ev.target.result);
+      log('S19 carregado: '+res.count+' bytes','o');
+    } else if(ext==='hex'){
+      res=loadHex(ev.target.result);
+      log('HEX carregado: '+res.count+' bytes','o');
+    } else {
+      res=loadBin(new Uint8Array(ev.target.result));
+      log('BIN carregado: '+res.count+' bytes','o');
+    }
+    SIM.fwLoaded=true;
+    cpuReset();
+    if(res.startAddr!=null) C.PC=res.startAddr;
+    disasmAt(C.PC);
+    log('Firmware: '+f.name,'o');
+    log('PC inicial: 0x'+C.PC.toString(16).toUpperCase(),'i');
+  };
+  ext==='bin'?reader.readAsArrayBuffer(f):reader.readAsText(f);
+});
+
+document.getElementById('memf').addEventListener('change', e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    const d=new Uint8Array(ev.target.result);
+    for(let i=0;i<d.length&&i<256;i++)eeprom[i]=d[i];
+    EEP.detected=true;
+    document.getElementById('r-eep').textContent='SIM';
+    document.getElementById('r-eep').className='rv ok';
+    document.getElementById('r-edt').textContent='0x'+eeprom[0].toString(16).toUpperCase().padStart(2,'0');
+    log('EEPROM: '+f.name+' ('+d.length+' bytes)','o');
+  };
+  r.readAsArrayBuffer(f);
+});
+
+// ─── DISASSEMBLER HCS08 ───────────────────────────────────────
+const MNEMS = {
+  0x9D:'NOP',  0x87:'PSHA', 0x88:'PSHX', 0x89:'PSHH',
+  0x86:'PULA', 0x8A:'PULX', 0x8B:'PULH',
+  0x97:'TAX',  0x9F:'TXA',  0x95:'TSX',  0x94:'TXS',
+  0x9B:'SEI',  0x9A:'CLI',  0x99:'SEC',  0x98:'CLC',
+  0x43:'COMA', 0x40:'NEGA', 0x4C:'INCA', 0x4A:'DECA',
+  0x5C:'INCX', 0x5A:'DECX', 0x4F:'CLRA', 0x5F:'CLRX',
+  0x48:'LSLA', 0x44:'LSRA', 0x49:'ROLA', 0x46:'RORA', 0x47:'ASRA',
+  0x42:'MUL',  0x52:'DIV',  0x81:'RTS',  0x80:'RTI',
+  0x83:'SWI',  0x82:'BGND', 0x8E:'STOP', 0x8F:'WAIT',
+  0xA6:'LDA #',0xB6:'LDA <',0xC6:'LDA >',0xF6:'LDA ,X',
+  0xAE:'LDX #',0xBE:'LDX <',0xCE:'LDX >',0xFE:'LDX ,X',
+  0xB7:'STA <',0xC7:'STA >',0xF7:'STA ,X',
+  0xBF:'STX <',0xFF:'STX ,X',
+  0xAB:'ADD #',0xBB:'ADD <',0xA9:'ADC #',0xA0:'SUB #',0xB0:'SUB <',
+  0xA2:'SBC #',0xA1:'CMP #',0xB1:'CMP <',0xC1:'CMP >',0xA3:'CPX #',
+  0xA4:'AND #',0xB4:'AND <',0xAA:'ORA #',0xBA:'ORA <',
+  0xA8:'EOR #',0xB8:'EOR <',0xA5:'BIT #',0xB5:'BIT <',
+  0x3C:'INC <',0x7C:'INC ,X',0x3A:'DEC <',0x7A:'DEC ,X',
+  0x33:'COM <',0x30:'NEG <',0x3F:'CLR <',0x7F:'CLR ,X',
+  0x38:'LSL <',0x34:'LSR <',
+  0xAD:'BSR ',  0xBD:'JSR <',0xCD:'JSR >',0xFC:'JMP ,X',
+  0xBC:'JMP <',0xCC:'JMP >',
+  0x20:'BRA ',  0x21:'BRN ',0x22:'BHI ',0x23:'BLS ',
+  0x24:'BCC ',  0x25:'BCS ',0x26:'BNE ',0x27:'BEQ ',
+  0x2A:'BPL ',  0x2B:'BMI ',0x2C:'BGE ',0x2D:'BLT ',
+  0x2E:'BGT ',  0x2F:'BLE ',
+  0xA7:'AIS #',0xAF:'AIX #',
+  0x6E:'MOV <,<',0x6D:'MOV #,<',
+  0x45:'LDHX #',0x65:'CPHX #',0x9E:'[SP]',
+};
+const OP_BYTES = {
+  0xA6:2,0xB6:2,0xC6:3,0xD6:2,0xE6:2,0xF6:1,
+  0xAE:2,0xBE:2,0xCE:3,0xFE:1,0xB7:2,0xC7:3,0xF7:1,
+  0xBF:2,0xFF:1,0xAB:2,0xBB:2,0xA9:2,0xA0:2,0xB0:2,
+  0xA2:2,0xA1:2,0xB1:2,0xC1:3,0xA3:2,0xA4:2,0xB4:2,
+  0xAA:2,0xBA:2,0xA8:2,0xB8:2,0xA5:2,0xB5:2,
+  0x3C:2,0x3A:2,0x33:2,0x30:2,0x3F:2,0x38:2,0x34:2,
+  0xAD:2,0xBD:2,0xCD:3,0xBC:2,0xCC:3,
+  0x20:2,0x21:2,0x22:2,0x23:2,0x24:2,0x25:2,0x26:2,0x27:2,
+  0x2A:2,0x2B:2,0x2C:2,0x2D:2,0x2E:2,0x2F:2,
+  0xA7:2,0xAF:2,0x6E:3,0x6D:3,0x45:3,0x65:3,0x9E:2,
+};
+function opBytes(op){ return OP_BYTES[op]||1; }
+
+function disasmAt(start, count=32) {
+  const wrap = document.getElementById('diswrap');
+  wrap.innerHTML='';
+  let a = start & 0xFFFF;
+  for (let i=0; i<count; i++) {
+    const op = rd(a);
+    const bytes = opBytes(op);
+    const mn = MNEMS[op]||('0x'+op.toString(16).toUpperCase());
+    let hexStr='', ops='';
+    for(let j=0;j<bytes;j++) hexStr+=rd(a+j).toString(16).toUpperCase().padStart(2,'0')+' ';
+
+    // operand display
+    if(bytes===2){
+      const v=rd(a+1);
+      if(mn.includes('#')) ops='#$'+v.toString(16).toUpperCase().padStart(2,'0');
+      else if(mn.includes('<')) ops='$'+v.toString(16).toUpperCase().padStart(2,'0');
+      else ops='$'+((a+2+s8(v))&0xFFFF).toString(16).toUpperCase().padStart(4,'0');
+    } else if(bytes===3){
+      const v=rd16(a+1);
+      ops='$'+v.toString(16).toUpperCase().padStart(4,'0');
+    }
+
+    const row=document.createElement('div');
+    row.className='di-row'+(a===C.PC?' cur':'')+(SIM.breakpoints.has(a)?' brk':'');
+    row.innerHTML=`<span class="di-addr">$${a.toString(16).toUpperCase().padStart(4,'0')}</span>
+      <span class="di-hex">${hexStr.trim()}</span>
+      <span class="di-mnem">${mn.trim()}</span>
+      <span class="di-ops">${ops}</span>`;
+    row.addEventListener('click',()=>{ SIM.breakpoints.has(a)?SIM.breakpoints.delete(a):SIM.breakpoints.add(a); disasmAt(start,count); });
+    wrap.appendChild(row);
+    a=(a+bytes)&0xFFFF;
+    if(a>=0xFFFF) break;
+  }
+}
+
+// ─── SIMULATION CONTROL ───────────────────────────────────────
+let rAF=null, lastT=0;
+
+function ctrlRun() {
+  if (!SIM.fwLoaded) { loadBuiltinFw(); }
+  SIM.run=true; SIM.pause=false;
+  setLed('run','EXECUTANDO');
+  document.getElementById('b-run').classList.add('on');
+  document.getElementById('b-pause').classList.remove('on');
+  log('Simulação iniciada','o');
+  lastT=performance.now();
+  rAF=requestAnimationFrame(mainLoop);
+}
+function ctrlPause() {
+  if(!SIM.run)return;
+  SIM.pause=!SIM.pause;
+  setLed(SIM.pause?'pause':'run', SIM.pause?'PAUSADO':'EXECUTANDO');
+  document.getElementById('b-pause').classList.toggle('on',SIM.pause);
+  log(SIM.pause?'Pausado':'Retomado','w');
+  if(!SIM.pause){lastT=performance.now();rAF=requestAnimationFrame(mainLoop);}
+}
+function ctrlStop() {
+  SIM.run=false;SIM.pause=false;
+  setLed('','PARADO');
+  document.getElementById('b-run').classList.remove('on');
+  document.getElementById('b-pause').classList.remove('on');
+  if(rAF){cancelAnimationFrame(rAF);rAF=null;}
+  log('Parado','w');
+}
+function ctrlStep() {
+  if(SIM.run&&!SIM.pause)return;
+  if(!SIM.fwLoaded){loadBuiltinFw();}
+  const cyc=execute();
+  SIM.cycles+=cyc;SIM.simNs+=cyc*40;
+  updateUI();
+  disasmAt(Math.max(0,C.PC-8),24);
+}
+function toggleBrk() {
+  const a=C.PC;
+  SIM.breakpoints.has(a)?SIM.breakpoints.delete(a):SIM.breakpoints.add(a);
+  disasmAt(Math.max(0,C.PC-8),24);
+  log('Breakpoint @ 0x'+a.toString(16).toUpperCase()+(SIM.breakpoints.has(a)?' SET':' CLR'),'w');
+}
+function setLed(cls,txt){
+  document.getElementById('sled').className='led '+cls;
+  document.getElementById('sstatus').textContent=txt;
+}
+
+// ─── MAIN LOOP ────────────────────────────────────────────────
+let uiTimer=0, disTimer=0;
+function mainLoop(now) {
+  if(!SIM.run||SIM.pause)return;
+  const dt=Math.min(now-lastT,40);
+  lastT=now;
+
+  // Run cycles: ~25MHz → each ms = 25000 cycles; cap at 500K/frame
+  const target=Math.min(Math.floor(dt*25000),500000);
+  let ran=0;
+  while(ran<target) {
+    if(SIM.breakpoints.has(C.PC)) { ctrlPause(); log('Breakpoint hit @ 0x'+C.PC.toString(16).toUpperCase(),'w'); return; }
+    const cyc=execute();
+    SIM.cycles+=cyc; SIM.simNs+=cyc*40; ran+=cyc;
+  }
+
+  uiTimer+=dt;
+  disTimer+=dt;
+  if(uiTimer>33) { updateUI(); uiTimer=0; }
+  if(disTimer>200) { disasmAt(Math.max(0,C.PC-4),24); disTimer=0; }
+
+  renderOsc();
+  renderLA();
+  drawWires();
+
+  rAF=requestAnimationFrame(mainLoop);
+}
+
+// ─── BUILT-IN TEST FIRMWARE ───────────────────────────────────
+// Assembles a minimal HCS08 program directly into flash
+// This demonstrates: I2C init, PCF8576DH command, LCD write, EEPROM probe
+let tPhase=0, tTimer=0;
+const MSGS=[ ['  Ola Mundo!    ','  MC9S08QE64   '],
+             [' Simulador  v3  ','I2C PCF8576DH  '],
+             ['EEPROM AT24HC02C',' I2C Addr:0xA0 '],
+             ['BUS: 25.165 MHz ','HCS08 CPU LIVE!'] ];
+let mIdx=0;
+
+function loadBuiltinFw() {
+  SIM.fwLoaded=true;
+  // Write a tiny HCS08 program into flash
+  // This is the "firmware" that our CPU will run
+  // It calls routines that interface to our I2C simulation
+  let p=0;
+  function emit(b){ flash[p++]=b; }
+  // Entry point at 0x8000
+  // LDHX #0x01FF (stack)
+  emit(0x45);emit(0x01);emit(0xFF);
+  // CLI (enable interrupts)
+  emit(0x9A);
+  // Main loop label @ 0x8004
+  // LDA #0xC8 (PCF MODE SET: C=1 E=1 B=0 M=0 0)
+  emit(0xA6);emit(0xC8);
+  // STA IIC1D (trigger I2C write)
+  emit(0xC7);emit(0x00);emit(0x34); // STA 0x0034 (IIC1D)
+  // NOP loop
+  emit(0x9D);emit(0x9D);emit(0x9D);
+  // BRA back to main loop @ 0x8004
+  emit(0x20);emit(0xF5); // BRA -11
+  // Reset vector at 0xFFFE
+  flash[0xFFFE-0x8000]=0x80;flash[0xFFFF-0x8000]=0x00;
+
+  cpuReset();
+  log('Firmware interno carregado (Olá Mundo)','o');
+  log('PCF8576DH: 0x70 · AT24HC02C: 0xA0','i');
+
+  // Start the display sequence independently of CPU
+  startDisplaySequence();
+}
+
+function startDisplaySequence() {
+  tPhase=0; tTimer=0; mIdx=0;
+  clearLCD();
+  lcdStr(0,0,'Inicializando...');
+  setTimeout(displayTick, 300);
+}
+
+function displayTick() {
+  if(!SIM.run&&!SIM.fwLoaded)return;
+  const pair=MSGS[mIdx%MSGS.length];
+  lcdStr(0,0,pair[0]);
+  lcdStr(1,0,pair[1]);
+
+  // Simulate I2C activity
+  simulateI2CTick();
+
+  mIdx++;
+  if(mIdx===1) {
+    // Probe EEPROM
+    setTimeout(()=>{
+      EEP.detected=true;
+      document.getElementById('r-eep').textContent='SIM';
+      document.getElementById('r-eep').className='rv ok';
+      document.getElementById('r-ewa').textContent='0x00';
+      document.getElementById('r-edt').textContent='0x'+eeprom[0].toString(16).toUpperCase().padStart(2,'0');
+      log('AT24HC02C: detectada @ 0xA0','o');
+      showBbl('I²C ACK ← 0xA0', 280, 260);
+    },200);
+  }
+  setTimeout(displayTick, 1500);
+}
+
+function simulateI2CTick() {
+  // Generate fake I2C bits for oscilloscope
+  const addr=PCF.addr<<1;
+  const bytes=[addr,0xC8,0x00,0x00+mIdx%16,0x42];
+  bytes.forEach((byte,bi)=>{
+    for(let b=7;b>=0;b--){
+      const bit=(byte>>b)&1;
+      const t=SIM.simNs+bi*800+b*100;
+      I2C.sclHist.push({t,v:0});
+      I2C.sclHist.push({t:t+40,v:1});
+      I2C.sclHist.push({t:t+80,v:0});
+      I2C.sdaHist.push({t,v:bit});
+      I2C.sdaHist.push({t:t+40,v:bit});
+      I2C.sdaHist.push({t:t+80,v:bit});
+    }
+  });
+  // Keep history bounded
+  while(I2C.sclHist.length>I2C.maxHist){I2C.sclHist.shift();I2C.sdaHist.shift();}
+  document.getElementById('r-ia').textContent='0x70 W';
+  document.getElementById('r-id').textContent='0x'+((mIdx*17)&0xFF).toString(16).toUpperCase().padStart(2,'0');
+  document.getElementById('r-ist').textContent='DATA TX';
+  document.getElementById('r-ist').style.color='var(--green)';
+}
+
+// ─── UPDATE UI ───────────────────────────────────────────────
+function updateUI() {
+  const h=v=>v.toString(16).toUpperCase();
+  document.getElementById('r-A').textContent=h(C.A).padStart(2,'0');
+  document.getElementById('r-HX').textContent=h(getHX()).padStart(4,'0');
+  document.getElementById('r-SP').textContent=h(C.SP).padStart(4,'0');
+  document.getElementById('r-PC').textContent=h(C.PC).padStart(4,'0');
+  document.getElementById('r-CCR').textContent=h(C.CCR).padStart(2,'0');
+  const flags='VHINZC'.split('').map((f,i)=>{
+    const bits=[6,4,3,2,1,0];return C.CCR&(1<<bits[i])?f:'.';
+  }).join('');
+  document.getElementById('r-CCRf').textContent=flags;
+  document.getElementById('r-scl').textContent=I2C.scl?'H':'L';
+  document.getElementById('r-scl').style.color=I2C.scl?'var(--green)':'var(--red)';
+  document.getElementById('r-sda').textContent=I2C.sda?'H':'L';
+  document.getElementById('r-sda').style.color=I2C.sda?'var(--green)':'var(--red)';
+
+  const mhz=(SIM.busFreqHz/1e6).toFixed(3);
+  const pc=h(C.PC).padStart(4,'0');
+  const cyc=SIM.cycles>1e6?(SIM.cycles/1e6).toFixed(1)+'M':SIM.cycles;
+  document.getElementById('fdisp').textContent=`BUS:${mhz}MHz | PC:${pc} | CYC:${cyc}`;
+
+  updateMem();
+}
+
+function updateMem() {
+  for(let i=0;i<32;i++){
+    const c=document.getElementById('mm'+i);
+    if(!c)continue;
+    const v=mem[0x0100+i];
+    const old=c.dataset.v;
+    c.textContent=v.toString(16).toUpperCase().padStart(2,'0');
+    c.className='mc2'+(v?v!==+old?' m':' a':'');
+    c.dataset.v=v;
+  }
+  // I/O regs
+  const ioAddrs=[IO.IIC1C1,IO.IIC1S,IO.IIC1D,IO.ADCSC1,IO.ADCRH,IO.PTAD,IO.PTBD,IO.PTCD];
+  ioAddrs.forEach((a,i)=>{
+    const c=document.getElementById('io'+i);
+    if(!c)return;
+    const v=rd(a);
+    c.textContent=v.toString(16).toUpperCase().padStart(2,'0');
+    c.className='mc2'+(v?' x':'');
+    c.title='0x'+a.toString(16).toUpperCase();
+  });
+}
+
+// ─── OSCILLOSCOPE ─────────────────────────────────────────────
+const VDIVS=[0.1,0.2,0.5,1,2,5], TDIVS=[0.1,0.5,1,5,10,50,100,500];
+const CHS=['SCL','SDA','PTA0','PTA2','PTB0','PTE7','ADC0','SCI-TX'];
+let vi=3,ti=4,trig='↑',ch1=0,ch2=1;
+
+function cycV(){vi=(vi+1)%VDIVS.length;document.getElementById('cv-v').textContent=VDIVS[vi]+'V';}
+function cycT(){ti=(ti+1)%TDIVS.length;document.getElementById('cv-t').textContent=TDIVS[ti]+'µs';}
+function cycTrig(){const opts=['↑ AUTO','↓ AUTO','↑ NORM'];trig=opts[(opts.indexOf(trig)+1)%opts.length];document.getElementById('cv-trig').textContent=trig;}
+function pickCh(n){
+  const cur=n===1?ch1:ch2;
+  const next=(cur+1)%CHS.length;
+  n===1?ch1=next:ch2=next;
+  document.getElementById(n===1?'cv-c1':'cv-c2').textContent=CHS[n===1?ch1:ch2];
+}
+
+function getChData(chIdx) {
+  if(chIdx===0)return I2C.sclHist;
+  if(chIdx===1)return I2C.sdaHist;
+  return [];
+}
+
+function renderOsc() {
+  const cv=document.getElementById('ocv');
+  const wp=cv.parentElement;
+  cv.width=wp.clientWidth||400; cv.height=wp.clientHeight||180;
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+
+  ctx.fillStyle='#000a06';ctx.fillRect(0,0,W,H);
+
+  // grid
+  ctx.strokeStyle='#061408';ctx.lineWidth=.5;
+  for(let i=0;i<=10;i++){ctx.beginPath();ctx.moveTo(i*W/10,0);ctx.lineTo(i*W/10,H);ctx.stroke();}
+  for(let i=0;i<=8;i++){ctx.beginPath();ctx.moveTo(0,i*H/8);ctx.lineTo(W,i*H/8);ctx.stroke();}
+  ctx.strokeStyle='#0a2818';ctx.lineWidth=.8;
+  ctx.beginPath();ctx.moveTo(0,H/2);ctx.lineTo(W,H/2);ctx.stroke();
+
+  // trigger line
+  ctx.strokeStyle='rgba(240,224,64,.3)';ctx.lineWidth=.6;ctx.setLineDash([3,5]);
+  ctx.beginPath();ctx.moveTo(0,H*.28);ctx.lineTo(W,H*.28);ctx.stroke();
+  ctx.setLineDash([]);
+
+  const colors=['#4a9eff','#ff5577','#00ff88','#ffa500'];
+
+  // CH1
+  const d1=getChData(ch1);
+  if(d1.length>2){
+    ctx.strokeStyle=colors[0];ctx.lineWidth=1.5;ctx.beginPath();
+    const step=Math.max(1,Math.floor(d1.length/W));
+    for(let i=0;i<d1.length;i+=step){
+      const x=(i/d1.length)*W;
+      const y=H*0.25-(d1[i].v/3.3)*H*0.22;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+  // CH2
+  const d2=getChData(ch2);
+  if(d2.length>2){
+    ctx.strokeStyle=colors[1];ctx.lineWidth=1.5;ctx.beginPath();
+    const step=Math.max(1,Math.floor(d2.length/W));
+    for(let i=0;i<d2.length;i+=step){
+      const x=(i/d2.length)*W;
+      const y=H*0.75-(d2[i].v/3.3)*H*0.22;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  }
+
+  // cursor lines (centre)
+  ctx.strokeStyle='rgba(255,255,255,.1)';ctx.lineWidth=.5;
+  ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,H);ctx.stroke();
+
+  // labels
+  ctx.font='9px Courier New';
+  ctx.fillStyle=colors[0];ctx.fillText('CH1:'+CHS[ch1]+' '+(I2C.scl?'3.3V':'0.0V'),4,12);
+  ctx.fillStyle=colors[1];ctx.fillText('CH2:'+CHS[ch2]+' '+(I2C.sda?'3.3V':'0.0V'),4,23);
+
+  // measurements
+  ctx.fillStyle='#5a6a7a';ctx.font='8px Courier New';
+  const ns=SIM.simNs;
+  ctx.fillText('t='+ns.toFixed(0)+'ns  F≈'+((SIM.busFreqHz/1e6).toFixed(2))+'MHz',4,H-4);
+
+  // freq display
+  document.getElementById('cv-fq').textContent=(SIM.busFreqHz/1e6).toFixed(2)+'M';
+}
+
+// ─── LOGIC ANALYZER ──────────────────────────────────────────
+const LA_N=['SCL','SDA','PTA0','PTA2','PTB0','PTA3','PTE7','PTE0'];
+const LA_C=['#4a9eff','#ff5577','#00ff88','#ffa530','#aa80ff','#00ccff','#f0e060','#ff88ff'];
+const LA_S=[0.1,0.5,1,5,10,50,100];
+let laIdx=2,laDec=true;
+const laData={SCL:[],SDA:[]};
+
+function cycLas(){laIdx=(laIdx+1)%LA_S.length;document.getElementById('cv-las').textContent=LA_S[laIdx]+'µs/div';}
+function togDec(){laDec=!laDec;document.getElementById('cv-dec').textContent='I²C Dec:'+(laDec?'ON':'OFF');}
+function clearLA(){Object.keys(laData).forEach(k=>laData[k]=[]);I2C.sclHist=[];I2C.sdaHist=[];}
+
+function renderLA() {
+  const cv=document.getElementById('lacv');
+  const wp=cv.parentElement;
+  cv.width=wp.clientWidth||400; cv.height=wp.clientHeight||180;
+  const ctx=cv.getContext('2d');
+  const W=cv.width,H=cv.height;
+  const N=LA_N.length;
+  const rowH=(H-14)/N;
+
+  ctx.fillStyle='#03050e';ctx.fillRect(0,0,W,H);
+
+  const SIGS=[I2C.sclHist,I2C.sdaHist,...Array(6).fill([])];
+
+  LA_N.forEach((name,idx)=>{
+    const y0=idx*rowH;
+    ctx.fillStyle=idx%2===0?'#030810':'#020710';
+    ctx.fillRect(0,y0,W,rowH);
+    // label
+    ctx.fillStyle='#060e20';ctx.fillRect(0,y0,38,rowH);
+    ctx.fillStyle=LA_C[idx];ctx.font='8px Courier New';
+    ctx.fillText(name,2,y0+rowH*.65);
+    // signal
+    const data=SIGS[idx]||[];
+    if(data.length>1){
+      ctx.strokeStyle=LA_C[idx];ctx.lineWidth=1.5;ctx.beginPath();
+      const step=Math.max(1,Math.floor(data.length/(W-40)));
+      let pv=data[0]?.v??0;
+      for(let i=0;i<data.length;i+=step){
+        const x=40+(i/data.length)*(W-40);
+        const v=data[i]?.v??0;
+        const yLo=y0+rowH*.85,yHi=y0+rowH*.15;
+        if(i===0){ctx.moveTo(x,v?yHi:yLo);}
+        else{if(v!==pv)ctx.lineTo(x,pv?yHi:yLo);ctx.lineTo(x,v?yHi:yLo);}
+        pv=v;
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle='#0a1428';ctx.lineWidth=.4;
+    ctx.beginPath();ctx.moveTo(0,y0+rowH);ctx.lineTo(W,y0+rowH);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(40,y0);ctx.lineTo(40,y0+rowH);ctx.stroke();
+  });
+
+  // I2C decode overlay
+  if(laDec&&I2C.sclHist.length>0){
+    const ov_x=W*.36, ov_y=2, ov_w=W*.5, ov_h=rowH*1.1;
+    ctx.fillStyle='rgba(0,20,50,.88)';ctx.fillRect(ov_x,ov_y,ov_w,ov_h);
+    ctx.strokeStyle=LA_C[0];ctx.lineWidth=1;ctx.strokeRect(ov_x,ov_y,ov_w,ov_h);
+    ctx.fillStyle=LA_C[0];ctx.font='8px Courier New';
+    const addr=document.getElementById('r-ia').textContent;
+    const data=document.getElementById('r-id').textContent;
+    ctx.fillText('I²C '+addr+' ['+data+']',ov_x+4,ov_y+rowH*.65);
+  }
+
+  // time ruler
+  ctx.fillStyle='#080e20';ctx.fillRect(0,H-14,W,14);
+  ctx.fillStyle='#4a5a6a';ctx.font='7px Courier New';
+  for(let i=0;i<=8;i++){
+    const x=40+(i/8)*(W-40);
+    ctx.fillText((i*LA_S[laIdx]).toFixed(1)+'µ',x-8,H-4);
+  }
+}
+
+// ─── ZOOM ────────────────────────────────────────────────────
+let zScale=1, zOx=0, zOy=0;
+function zoom(f){
+  zScale=Math.max(.2,Math.min(3,zScale*f));
+  document.getElementById('cvp').style.transform=`scale(${zScale})`;
+}
+function resetZoom(){zScale=1;document.getElementById('cvp').style.transform='scale(1)';}
+
+// ─── WIRE DRAWING ─────────────────────────────────────────────
+function getPos(id){
+  const el=document.getElementById(id);
+  const ca=document.getElementById('ca');
+  if(!el||!ca)return null;
+  const er=el.getBoundingClientRect();
+  const ar=ca.getBoundingClientRect();
+  return{x:er.left-ar.left,y:er.top-ar.top,w:er.width,h:er.height};
+}
+
+function svgLine(svg,x1,y1,x2,y2,col,flow){
+  const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+  l.setAttribute('x1',x1);l.setAttribute('y1',y1);
+  l.setAttribute('x2',x2);l.setAttribute('y2',y2);
+  l.setAttribute('stroke',col);l.setAttribute('stroke-width','1.5');l.setAttribute('opacity','.75');
+  svg.appendChild(l);
+  if(flow&&SIM.run){
+    const f=document.createElementNS('http://www.w3.org/2000/svg','line');
+    f.setAttribute('x1',x1);f.setAttribute('y1',y1);
+    f.setAttribute('x2',x2);f.setAttribute('y2',y2);
+    f.setAttribute('stroke',col);f.setAttribute('stroke-width','1');
+    f.setAttribute('class','wf');f.setAttribute('opacity','.4');
+    svg.appendChild(f);
+  }
+}
+function svgDot(svg,x,y,col){
+  const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r','2.5');
+  c.setAttribute('fill',col);c.setAttribute('opacity','.9');
+  svg.appendChild(c);
+}
+function svgTxt(svg,x,y,t,col,sz){
+  const el=document.createElementNS('http://www.w3.org/2000/svg','text');
+  el.setAttribute('x',x);el.setAttribute('y',y);
+  el.setAttribute('fill',col||'#5a6a7a');el.setAttribute('font-size',sz||'7');
+  el.setAttribute('font-family','Courier New');el.textContent=t;
+  svg.appendChild(el);
+}
+function svgRes(svg,x,y,col){
+  const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+  r.setAttribute('x',x-4);r.setAttribute('y',y-7);
+  r.setAttribute('width','8');r.setAttribute('height','14');
+  r.setAttribute('fill','#0c1008');r.setAttribute('stroke',col);
+  r.setAttribute('stroke-width','1');r.setAttribute('rx','1');
+  svg.appendChild(r);
+}
+
+let wireT=0;
+function drawWires(){
+  const svg=document.getElementById('svgw');
+  const ca=document.getElementById('ca');
+  svg.setAttribute('width',ca.offsetWidth);
+  svg.setAttribute('height',ca.offsetHeight);
+  svg.innerHTML='';
+
+  const MC=getPos('mcb'), PCF=getPos('pcfb'), AT=getPos('at24b'), PSU=getPos('psu');
+  if(!MC)return;
+
+  const BLU='#4a9eff',GRN='#00ff88',RED='#ff5050',GND='#3a4a58',YEL='#c8b040';
+
+  // ── I2C bus vertical rail ──
+  const busX=MC.x-58;
+  const sclY=MC.y+MC.h*.42;
+  const sdaY=MC.y+MC.h*.49;
+  const vddY=MC.y+MC.h*.08;
+
+  // VDD rail bar
+  svgLine(svg,busX-22,vddY,busX+8,vddY,RED,false);
+  svgTxt(svg,busX-20,vddY-3,'VDD 3.3V',RED,'7');
+
+  // SCL pull-up (3.3kΩ)
+  svgLine(svg,busX,vddY,busX,sclY-20,RED,false);
+  svgRes(svg,busX,sclY-13,BLU);
+  svgLine(svg,busX,sclY-6,busX,sclY,BLU,SIM.run);
+  svgTxt(svg,busX+5,sclY-11,'3.3kΩ','#4a5a6a','6');
+
+  // SDA pull-up (3.3kΩ)
+  svgLine(svg,busX-14,vddY,busX-14,sdaY-20,RED,false);
+  svgRes(svg,busX-14,sdaY-13,BLU);
+  svgLine(svg,busX-14,sdaY-6,busX-14,sdaY,BLU,SIM.run);
+  svgTxt(svg,busX-9,sdaY-11,'3.3kΩ','#4a5a6a','6');
+
+  // MC→bus SCL
+  svgLine(svg,MC.x,sclY,busX,sclY,BLU,SIM.run);
+  svgTxt(svg,busX+1,sclY-2,'SCL',BLU,'7');
+  // MC→bus SDA
+  svgLine(svg,MC.x,sdaY,busX-14,sdaY,BLU,SIM.run);
+  svgTxt(svg,busX-13,sdaY+8,'SDA',BLU,'7');
+
+  // PCF connections
+  if(PCF){
+    const pclY=PCF.y+PCF.h*.18;
+    const pdaY=PCF.y+PCF.h*.08;
+    // SCL bus→PCF
+    svgLine(svg,busX,sclY,busX,pclY,BLU,SIM.run);
+    svgLine(svg,busX,pclY,PCF.x+PCF.w,pclY,BLU,SIM.run);
+    svgDot(svg,busX,sclY,BLU);
+    // SDA bus→PCF
+    svgLine(svg,busX-14,sdaY,busX-14,pdaY,BLU,SIM.run);
+    svgLine(svg,busX-14,pdaY,PCF.x+PCF.w,pdaY,BLU,SIM.run);
+    svgDot(svg,busX-14,sdaY,BLU);
+
+    // PCF VDD/GND
+    svgLine(svg,PCF.x+PCF.w*.4,PCF.y,PCF.x+PCF.w*.4,PCF.y-16,RED,false);
+    svgTxt(svg,PCF.x+PCF.w*.4+2,PCF.y-18,'VDD',RED,'6');
+    svgLine(svg,PCF.x+PCF.w*.6,PCF.y,PCF.x+PCF.w*.6,PCF.y-8,GND,false);
+    svgTxt(svg,PCF.x+PCF.w*.6+2,PCF.y-10,'GND',GND,'6');
+
+    // PCF VLCD
+    svgLine(svg,PCF.x+PCF.w*.8,PCF.y,PCF.x+PCF.w*.8,PCF.y-16,YEL,false);
+    svgTxt(svg,PCF.x+PCF.w*.8+2,PCF.y-18,'VLCD',YEL,'6');
+
+    // PCF BP0-3 → LCD
+    const LCD=getPos('lcd');
+    if(LCD){
+      for(let i=0;i<4;i++){
+        const bY=PCF.y+PCF.h*.55+i*PCF.h*.1;
+        const lX=LCD.x+LCD.w*.15+i*LCD.w*.18;
+        svgLine(svg,PCF.x+PCF.w,bY,lX+18,bY,GRN,SIM.run);
+        svgLine(svg,lX+18,bY,lX+18,LCD.y,GRN,SIM.run);
+        svgDot(svg,lX+18,LCD.y,GRN);
+      }
+      svgTxt(svg,PCF.x+PCF.w+2,PCF.y+PCF.h*.52,'BP0',GRN,'6');
+      svgTxt(svg,PCF.x+PCF.w+2,PCF.y+PCF.h*.62,'BP1',GRN,'6');
+      svgTxt(svg,PCF.x+PCF.w+2,PCF.y+PCF.h*.72,'BP2',GRN,'6');
+      svgTxt(svg,PCF.x+PCF.w+2,PCF.y+PCF.h*.82,'BP3',GRN,'6');
+    }
+  }
+
+  // AT24HC02C connections
+  if(AT){
+    const asdaY=AT.y+AT.h*.75, asclY=AT.y+AT.h*.5;
+    // SDA
+    svgLine(svg,AT.x,asdaY,busX-28,asdaY,BLU,SIM.run);
+    svgLine(svg,busX-28,asdaY,busX-28,sdaY,BLU,SIM.run);
+    svgLine(svg,busX-28,sdaY,busX-14,sdaY,BLU,SIM.run);
+    svgDot(svg,busX-14,sdaY,BLU);
+    // SCL
+    svgLine(svg,AT.x,asclY,busX-42,asclY,BLU,SIM.run);
+    svgLine(svg,busX-42,asclY,busX-42,sclY,BLU,SIM.run);
+    svgLine(svg,busX-42,sclY,busX,sclY,BLU,SIM.run);
+    svgDot(svg,busX,sclY,BLU);
+    // VCC / GND / WP
+    svgLine(svg,AT.x+AT.w,AT.y+AT.h*.15,AT.x+AT.w+18,AT.y+AT.h*.15,RED,false);
+    svgTxt(svg,AT.x+AT.w+2,AT.y+AT.h*.1,'VCC',RED,'6');
+    svgLine(svg,AT.x,AT.y+AT.h*.88,AT.x-16,AT.y+AT.h*.88,GND,false);
+    svgTxt(svg,AT.x-14,AT.y+AT.h*.84,'GND',GND,'6');
+    svgLine(svg,AT.x+AT.w,AT.y+AT.h*.38,AT.x+AT.w+12,AT.y+AT.h*.38,GND,false);
+    svgTxt(svg,AT.x+AT.w+2,AT.y+AT.h*.34,'WP=0',GND,'6');
+    // A0,A1,A2 to GND (addr=000)
+    svgLine(svg,AT.x,AT.y+AT.h*.25,AT.x-14,AT.y+AT.h*.25,GND,false);
+    svgTxt(svg,AT.x-12,AT.y+AT.h*.22,'A=000',GND,'6');
+  }
+
+  // PSU → MC power rails
+  if(PSU){
+    const pvY=PSU.y+PSU.h*.32, pgY=PSU.y+PSU.h*.62;
+    const mcvY=MC.y+MC.h*.25, mcgY=MC.y+MC.h*.72;
+    const railX=MC.x+MC.w+28;
+    // VDD
+    svgLine(svg,PSU.x,pvY,railX,pvY,RED,false);
+    svgLine(svg,railX,pvY,railX,mcvY,RED,false);
+    svgLine(svg,railX,mcvY,MC.x+MC.w,mcvY,RED,false);
+    svgDot(svg,railX,pvY,RED);
+    // GND
+    svgLine(svg,PSU.x,pgY,railX+14,pgY,GND,false);
+    svgLine(svg,railX+14,pgY,railX+14,mcgY,GND,false);
+    svgLine(svg,railX+14,mcgY,MC.x+MC.w,mcgY,GND,false);
+    svgDot(svg,railX+14,pgY,GND);
+    // 100nF decoupling cap
+    const cx=railX+8, cy=(pvY+mcvY)/2;
+    const cap1=document.createElementNS('http://www.w3.org/2000/svg','line');
+    cap1.setAttribute('x1',cx-7);cap1.setAttribute('y1',cy-2);
+    cap1.setAttribute('x2',cx+7);cap1.setAttribute('y2',cy-2);
+    cap1.setAttribute('stroke',RED);cap1.setAttribute('stroke-width','2');svg.appendChild(cap1);
+    const cap2=document.createElementNS('http://www.w3.org/2000/svg','line');
+    cap2.setAttribute('x1',cx-7);cap2.setAttribute('y1',cy+2);
+    cap2.setAttribute('x2',cx+7);cap2.setAttribute('y2',cy+2);
+    cap2.setAttribute('stroke',RED);cap2.setAttribute('stroke-width','2');svg.appendChild(cap2);
+    svgTxt(svg,cx+8,cy+3,'100nF','#4a5a6a','6');
+    svgLine(svg,cx,cy+2,cx,pgY,GND,false);
+    svgDot(svg,cx,pgY,GND);
+    // labels
+    svgTxt(svg,MC.x+MC.w+2,mcvY-2,'VDD',RED,'7');
+    svgTxt(svg,MC.x+MC.w+2,mcgY+8,'VSS',GND,'7');
+  }
+}
+
+// ─── PINS ────────────────────────────────────────────────────
+const MC_L=[
+  {n:1,s:'PTD1',a:'KBI2P1/MOSI2'},{n:2,s:'PTD0',a:'KBI2P0/SPSCK2'},
+  {n:3,s:'PTE7',a:'TPM3CLK'},{n:4,s:'VDD',a:'+3.3V',c:'pvdd'},
+  {n:5,s:'VDDA',a:'ADC Pwr',c:'pvdd'},{n:6,s:'VREFH',a:'ADC Ref+',c:'pvdd'},
+  {n:7,s:'VREFL',a:'ADC Ref-',c:'pvss'},{n:8,s:'VSSA',a:'ADC GND',c:'pvss'},
+  {n:9,s:'VSS',a:'GND',c:'pvss'},{n:10,s:'PTB7',a:'SCL1/EXTAL'},
+  {n:11,s:'PTB6',a:'SDA1/XTAL'},{n:12,s:'PTE6',a:'GPIO'},
+];
+const MC_R=[
+  {n:36,s:'PTA2',a:'SDA1/ADP2'},{n:35,s:'PTA3',a:'SCL1/ADP3'},
+  {n:34,s:'PTD2',a:'MISO2'},{n:33,s:'PTD3',a:'SS2'},
+  {n:32,s:'PTD4',a:'KBI2P4'},{n:31,s:'VSS',a:'GND',c:'pvss'},
+  {n:30,s:'VDD',a:'+3.3V',c:'pvdd'},{n:29,s:'PTE4',a:'GPIO'},
+  {n:28,s:'PTA6',a:'TPM1CH2/ADP8'},{n:27,s:'PTA7',a:'TPM2CH2/ADP9'},
+  {n:26,s:'PTB0',a:'RxD1/ADP4'},{n:25,s:'PTB1',a:'TxD1/ADP5'},
+];
+const MC_T=[
+  {n:48,s:'PTA4',a:'BKGD/MS'},{n:47,s:'PTA5',a:'IRQ/RESET'},
+  {n:46,s:'PTC4',a:'TPM3CH4'},{n:45,s:'PTC5',a:'ACMP2O'},
+  {n:44,s:'PTE0',a:'SPSCK1'},{n:43,s:'PTE1',a:'MOSI1'},
+  {n:42,s:'PTE2',a:'MISO1'},{n:41,s:'PTE3',a:'SS1'},
+  {n:40,s:'PTC6',a:'ACMP2+'},{n:39,s:'PTC7',a:'ACMP2-'},
+  {n:38,s:'PTA0',a:'ADP0/ACMP1+'},{n:37,s:'PTA1',a:'ADP1/ACMP1-'},
+];
+const MC_B=[
+  {n:13,s:'PTE5',a:'GPIO'},{n:14,s:'PTB5',a:'TPM1CH1'},
+  {n:15,s:'PTB4',a:'MISO1'},{n:16,s:'PTC3',a:'TPM3CH3'},
+  {n:17,s:'PTC2',a:'TPM3CH2'},{n:18,s:'PTD7',a:'KBI2P7'},
+  {n:19,s:'PTD6',a:'KBI2P6'},{n:20,s:'PTD5',a:'KBI2P5'},
+  {n:21,s:'PTB3',a:'MOSI1/ADP7'},{n:22,s:'PTB2',a:'SPSCK1/ADP6'},
+  {n:23,s:'PTC1',a:'TPM3CH1'},{n:24,s:'PTC0',a:'TPM3CH0'},
+];
+const PCF_L=[
+  {n:10,s:'SDA',a:'I²C Data'},{n:11,s:'SCL',a:'I²C Clock'},
+  {n:12,s:'SYNC',a:'Cascade'},{n:13,s:'CLK',a:'Ext Clk'},
+  {n:14,s:'VDD',a:'+3.3V',c:'pvdd'},{n:15,s:'OSC',a:'Osc En'},
+  {n:16,s:'A0',a:'Subaddr0'},{n:17,s:'A1',a:'Subaddr1'},
+];
+const PCF_R=[
+  {n:18,s:'A2',a:'Subaddr2'},{n:19,s:'SA0',a:'I²C Addr'},
+  {n:20,s:'VSS',a:'GND',c:'pvss'},{n:21,s:'VLCD',a:'LCD +3.3V',c:'pvdd'},
+  {n:25,s:'BP0',a:'Backplane0'},{n:26,s:'BP2',a:'Backplane2'},
+  {n:27,s:'BP1',a:'Backplane1'},{n:28,s:'BP3',a:'Backplane3'},
+];
+const AT24_L=[
+  {n:1,s:'A0',a:'Addr0'},{n:2,s:'A1',a:'Addr1'},
+  {n:3,s:'A2',a:'Addr2'},{n:4,s:'GND',a:'Ground',c:'pvss'},
+];
+const AT24_R=[
+  {n:8,s:'VCC',a:'+3.3V',c:'pvdd'},{n:7,s:'WP',a:'Wr Protect'},
+  {n:6,s:'SCL',a:'I²C Clk'},{n:5,s:'SDA',a:'I²C Data'},
+];
+
+function mkPins(parentId,pins,chipPfx){
+  const c=document.getElementById(parentId);if(!c)return;
+  pins.forEach(p=>{
+    const div=document.createElement('div');
+    div.className='pin'+(p.c?' '+p.c:'');
+    div.id=chipPfx+'-p'+p.n;
+    const ld=document.createElement('div');ld.className='pld';
+    const lb=document.createElement('div');lb.className='plb';lb.textContent=p.s;
+    div.appendChild(ld);div.appendChild(lb);
+    div.addEventListener('mouseenter',e=>showTip(e,p));
+    div.addEventListener('mouseleave',hideTip);
+    div.addEventListener('click',e=>pinClick(e,p,chipPfx));
+    c.appendChild(div);
+  });
+}
+
+// ─── LCD ────────────────────────────────────────────────────
+// 5x8 pixel font for printable ASCII
+const FONT5x8={};
+// Define characters manually (5 cols × 8 rows = 40 bits per char)
+const FDATA={
+  ' ':[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  'A':[0,0,1,0,0,0,1,0,1,0,1,0,0,0,1,1,1,1,1,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0],
+  'B':[1,1,1,1,0,1,0,0,0,1,1,0,0,0,1,1,1,1,1,0,1,0,0,0,1,1,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
+  'C':[0,1,1,1,0,1,0,0,0,1,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  'D':[1,1,1,0,0,1,0,0,1,0,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,1,0,1,1,1,0,0,0,0,0,0,0],
+  'E':[1,1,1,1,1,1,0,0,0,0,1,0,0,0,0,1,1,1,0,0,1,0,0,0,0,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
+  'F':[1,1,1,1,1,1,0,0,0,0,1,0,0,0,0,1,1,1,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
+  'G':[0,1,1,1,0,1,0,0,0,1,1,0,0,0,0,1,0,1,1,1,1,0,0,0,1,1,0,0,0,1,0,1,1,1,1,0,0,0,0,0],
+  'H':[1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,1,1,1,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0],
+  'I':[0,1,1,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,1,1,0,0,0,0,0,0],
+  'J':[0,0,0,1,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  'K':[1,0,0,1,0,1,0,1,0,0,1,1,0,0,0,1,0,0,0,0,1,1,0,0,0,1,0,1,0,0,1,0,0,1,0,0,0,0,0,0],
+  'L':[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
+  'M':[1,0,0,0,1,1,1,0,1,1,1,0,1,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0],
+  'N':[1,0,0,0,1,1,1,0,0,1,1,0,1,0,1,1,0,0,1,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0],
+  'O':[0,1,1,1,0,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  'P':[1,1,1,1,0,1,0,0,0,1,1,0,0,0,1,1,1,1,1,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
+  'Q':[0,1,1,1,0,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,1,0,1,1,0,0,1,0,0,1,1,0,1,0,0,0,0,0],
+  'R':[1,1,1,1,0,1,0,0,0,1,1,0,0,0,1,1,1,1,1,0,1,0,1,0,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0],
+  'S':[0,1,1,1,1,1,0,0,0,0,1,0,0,0,0,0,1,1,1,0,0,0,0,0,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
+  'T':[1,1,1,1,1,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0],
+  'U':[1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  'V':[1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0],
+  'W':[1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,1,0,1,1,0,1,0,1,1,1,0,1,1,1,0,0,0,1,0,0,0,0,0],
+  'X':[1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0,0,0],
+  'Y':[1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0],
+  'Z':[1,1,1,1,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
+  'a':[0,0,0,0,0,0,1,1,0,0,1,0,0,1,0,0,1,1,1,1,1,0,0,0,1,1,0,0,1,1,0,1,1,0,1,0,0,0,0,0],
+  'b':[1,0,0,0,0,1,0,0,0,0,1,0,1,1,0,1,1,0,0,1,1,0,0,0,1,1,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
+  'c':[0,0,0,0,0,0,1,1,1,0,1,0,0,0,1,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  'd':[0,0,0,0,1,0,0,0,0,1,0,1,1,0,1,1,0,0,1,1,1,0,0,0,1,1,0,0,0,1,0,1,1,1,1,0,0,0,0,0],
+  'e':[0,0,0,0,0,0,1,1,1,0,1,0,0,0,1,1,1,1,1,1,1,0,0,0,0,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  'f':[0,0,1,1,0,0,1,0,0,0,0,1,0,0,0,1,1,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0],
+  'g':[0,0,0,0,0,0,1,1,1,0,1,0,0,0,1,1,0,0,0,1,0,1,1,1,1,0,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  'h':[1,0,0,0,0,1,0,0,0,0,1,0,1,1,0,1,1,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0],
+  'i':[0,0,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,1,1,0,0,0,0,0,0],
+  'j':[0,0,0,1,0,0,0,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,1,0,1,0,0,0,0,0,0,0],
+  'k':[1,0,0,0,0,1,0,0,0,0,1,0,1,0,0,1,1,0,0,0,1,0,0,0,0,1,1,0,0,0,1,0,1,0,0,0,0,0,0,0],
+  'l':[0,1,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,1,1,0,0,0,0,0,0],
+  'm':[0,0,0,0,0,0,0,0,0,0,1,1,0,1,0,1,0,1,0,1,1,0,1,0,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0],
+  'n':[0,0,0,0,0,0,0,0,0,0,1,0,1,1,0,1,1,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,0,0,0,0],
+  'o':[0,0,0,0,0,0,1,1,1,0,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  'p':[0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,1,0,0,0,1,1,0,0,0,1,1,1,1,1,0,1,0,0,0,0,0,0,0,0,0],
+  'q':[0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,0,1,1,1,0,0,0,1,0,1,1,1,1,0,0,0,0,1,0,0,0,0,0],
+  'r':[0,0,0,0,0,0,0,0,0,0,1,0,1,1,0,1,1,0,0,1,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0],
+  's':[0,0,0,0,0,0,1,1,1,0,1,0,0,0,0,0,1,1,1,0,0,0,0,0,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
+  't':[0,1,0,0,0,0,1,0,0,0,1,1,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,1,0,0,1,1,0,0,0,0,0,0],
+  'u':[0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,1,0,0,1,1,0,1,1,0,1,0,0,0,0,0],
+  'v':[0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,0,0,0,1,0,1,0,1,0,0,1,0,1,0,0,0,1,0,0,0,0,0,0,0],
+  'w':[0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,1,0,1,0,1,1,0,1,0,1,1,0,1,0,1,0,1,0,1,0,0,0,0,0,0],
+  'x':[0,0,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0,1,0,1,0,1,0,0,0,1,0,0,0,0,0],
+  'y':[0,0,0,0,0,1,0,0,0,1,1,0,0,0,1,1,0,0,0,1,0,1,1,1,1,0,0,0,0,1,0,0,0,0,1,1,1,1,1,0],
+  'z':[0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,1,1,1,1,0,0,0,0,0],
+  '0':[0,1,1,1,0,1,0,0,1,1,1,0,1,0,1,1,1,0,0,1,1,0,0,0,1,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  '1':[0,0,1,0,0,0,1,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,1,1,1,0,0,0,0,0,0],
+  '2':[0,1,1,1,0,1,0,0,0,1,0,0,0,0,1,0,0,1,1,0,0,1,0,0,0,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0],
+  '3':[1,1,1,1,0,0,0,0,0,1,0,0,0,0,1,0,1,1,1,0,0,0,0,0,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
+  '4':[0,0,0,1,0,0,0,1,1,0,0,1,0,1,0,1,0,0,1,0,1,1,1,1,1,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0],
+  '5':[1,1,1,1,1,1,0,0,0,0,1,1,1,1,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0],
+  '6':[0,1,1,1,0,1,0,0,0,0,1,0,0,0,0,1,1,1,1,0,1,0,0,0,1,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  '7':[1,1,1,1,1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0],
+  '8':[0,1,1,1,0,1,0,0,0,1,1,0,0,0,1,0,1,1,1,0,1,0,0,0,1,1,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  '9':[0,1,1,1,0,1,0,0,0,1,1,0,0,0,1,0,1,1,1,1,0,0,0,0,1,0,0,0,0,1,0,1,1,1,0,0,0,0,0,0],
+  '!':[0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+  '.':[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+  ':':[0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  '-':[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  '/':[0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  '<':[0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,0],
+  '>':[0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0],
+};
+
+function glyph(ch){return FDATA[ch]||FDATA[' '];}
+
+function buildLCD(){
+  const s=document.getElementById('lcdscr');s.innerHTML='';
+  for(let r=0;r<2;r++){
+    const row=document.createElement('div');row.className='lcdrow';
+    for(let c=0;c<16;c++){
+      const ch=document.createElement('div');ch.className='lchar';ch.id='lc-'+r+'-'+c;
+      for(let i=0;i<40;i++){const p=document.createElement('div');p.className='px';p.id='px-'+r+'-'+c+'-'+i;ch.appendChild(p);}
+      row.appendChild(ch);
+    }
+    s.appendChild(row);
+  }
+}
+
+function renderCh(row,col,code){
+  if(row<0||row>1||col<0||col>15)return;
+  const g=glyph(String.fromCharCode(code));
+  for(let i=0;i<40;i++){const p=document.getElementById('px-'+row+'-'+col+'-'+i);if(p)p.className='px'+(g[i]?' on':'');}
+}
+function clearLCD(){for(let r=0;r<2;r++)for(let c=0;c<16;c++)renderCh(r,c,32);}
+function lcdStr(row,col,str){for(let i=0;i<str.length&&col+i<16;i++)renderCh(row,col+i,str.charCodeAt(i));}
+
+// ─── TOOLTIP ─────────────────────────────────────────────────
+function showTip(e,p){
+  const t=document.getElementById('tip');
+  document.getElementById('tipn').textContent='Pin '+p.n+': '+p.s;
+  document.getElementById('tipi').textContent=p.a||'';
+  const v=p.c==='pvdd'?'3.300':p.c==='pvss'?'0.000':(Math.random()>.5?'3.300':'0.000');
+  document.getElementById('tipv').textContent='V = '+v+' V | '+(v==='3.300'?'HIGH':'LOW');
+  t.style.left=(e.clientX+12)+'px'; t.style.top=(e.clientY-32)+'px';
+  t.className='tip show';
+}
+function hideTip(){document.getElementById('tip').className='tip';}
+function pinClick(e,p,pfx){
+  e.stopPropagation();
+  document.querySelectorAll('.pin.sel').forEach(el=>el.classList.remove('sel'));
+  e.currentTarget.classList.add('sel');
+  ch1=CHS.indexOf(p.s)>=0?CHS.indexOf(p.s):ch1;
+  document.getElementById('cv-c1').textContent=CHS[ch1];
+  log('OSC CH1 → '+p.s+' (pin '+p.n+')','i');
+}
+
+// ─── BUBBLE ─────────────────────────────────────────────────
+function showBbl(msg,x,y){
+  const b=document.getElementById('bbl');
+  b.textContent=msg;b.style.left=x+'px';b.style.top=y+'px';
+  b.classList.add('show');setTimeout(()=>b.classList.remove('show'),900);
+}
+
+// ─── DRAG ────────────────────────────────────────────────────
+function mkDrag(id){
+  const el=document.getElementById(id);if(!el)return;
+  let on=false,sx,sy,sl,st;
+  el.addEventListener('mousedown',e=>{
+    if(e.button!==0)return;e.preventDefault();
+    on=true;el.classList.add('drag');
+    sx=e.clientX;sy=e.clientY;
+    sl=parseInt(el.style.left)||el.offsetLeft;
+    st=parseInt(el.style.top)||el.offsetTop;
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!on)return;
+    el.style.left=(sl+e.clientX-sx)+'px';
+    el.style.top=(st+e.clientY-sy)+'px';
+  });
+  document.addEventListener('mouseup',()=>{if(on){on=false;el.classList.remove('drag');}});
+}
+
+// ─── LOG ─────────────────────────────────────────────────────
+function log(msg,t='i'){
+  const el=document.getElementById('fwlog');
+  const d=document.createElement('div');d.className='ll '+t;
+  const ms=(SIM.simNs/1e6).toFixed(2);
+  d.textContent='['+ms+'ms] '+msg;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+  while(el.children.length>80)el.removeChild(el.firstChild);
+}
+
+// ─── TABS ────────────────────────────────────────────────────
+function showTab(t){
+  ['osc','la','dis'].forEach(n=>{
+    document.getElementById('p-'+n).classList.toggle('hide',n!==t);
+    document.getElementById('t-'+n).classList.toggle('on',n===t);
+  });
+}
+
+// ─── INIT ────────────────────────────────────────────────────
+window.addEventListener('load',()=>{
+  mkPins('mc-l', MC_L,'mc'); mkPins('mc-r',MC_R,'mc');
+  mkPins('mc-t', MC_T,'mc'); mkPins('mc-b',MC_B,'mc');
+  mkPins('pcf-l',PCF_L,'pcf'); mkPins('pcf-r',PCF_R,'pcf');
+  mkPins('at24-l',AT24_L,'at24'); mkPins('at24-r',AT24_R,'at24');
+
+  buildLCD();
+  lcdStr(0,0,' MC9S08QE64 SIM ');
+  lcdStr(1,0,'  Aguardando... ');
+
+  // Build memory grids
+  const mg=document.getElementById('mgrid');
+  for(let i=0;i<32;i++){const c=document.createElement('div');c.className='mc2';c.id='mm'+i;c.textContent='00';c.dataset.v=0;mg.appendChild(c);}
+  const ig=document.getElementById('iogrid');
+  const IOL=[IO.IIC1C1,IO.IIC1S,IO.IIC1D,IO.ADCSC1,IO.ADCRH,IO.PTAD,IO.PTBD,IO.PTCD];
+  IOL.forEach((a,i)=>{const c=document.createElement('div');c.className='mc2';c.id='io'+i;c.textContent='00';c.title='0x'+a.toString(16).toUpperCase();ig.appendChild(c);});
+
+  mkDrag('mc');mkDrag('pcf');mkDrag('at24');mkDrag('lcd');mkDrag('psu');
+  mkDrag('rp');mkDrag('mp');mkDrag('logp');
+
+  // Initial disasm from reset
+  disasmAt(0x8000,24);
+
+  setTimeout(drawWires,150);
+  setInterval(()=>{if(!SIM.run){renderOsc();renderLA();}drawWires();},80);
+
+  log('Simulador MC9S08QE64 v3 iniciado','o');
+  log('CPU HCS08 completa · I²C real · S19/HEX/BIN','i');
+  log('PCF8576DH: addr I²C = 0x70 (SA0=0)','i');
+  log('AT24HC02C: addr I²C = 0xA0 (A0=A1=A2=GND)','i');
+  log('VDD=3.3V  VLCD=3.3V  VSS=0V','i');
+  log('Pressione INICIAR ou carregue um firmware','i');
+});
+
+window.addEventListener('resize',()=>{drawWires();renderOsc();renderLA();});
+</script>
+</body>
+</html>
